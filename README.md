@@ -2,14 +2,20 @@
 
 <img src="assets/kurumichibi.png" width="200" />
 
-Kurumi is a multi-purpose Discord bot with:
-- AutoMod
-- Information commands
-- Manager tools
-- Miscellaneous features
-- Moderator tools
+Kurumi is a multi-purpose Discord bot built with Python.  
+It focuses on moderation, automation, and useful utilities for server management.  
 
-Currently has **33 commands**, aiming for **100+ commands**.
+## Features
+- [x] AutoMod (spam and rule enforcement)  
+- [x] Information commands  
+- [x] Manager tools  
+- [x] Miscellaneous utilities  
+- [x] Moderator tools  
+
+## Roadmap
+- Expand command set (currently **33**, goal: **100+**)  
+- Improve modularity with more cogs  
+- Add advanced moderation options  
 
 ---
 
