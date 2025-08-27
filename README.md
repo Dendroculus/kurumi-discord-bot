@@ -32,3 +32,8 @@ All trademarks and copyrights related to Discord are owned by their respective o
 
 All anime characters and artwork shown are the property of their respective creators.  
 Used here for non-commercial, portfolio purposes only.
+
+## Artwork Attribution
+
+The chibi character artwork featured in this project is created by [@pypy_nemui](https://x.com/pypy_nemui/status/1130490628096217088). Used here solely for non-commercial, portfolio purposes.
+
