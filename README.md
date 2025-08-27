@@ -6,7 +6,7 @@ Kurumi is a multi-purpose Discord bot built with Python.
 It focuses on moderation, automation, and useful utilities for server management.  
 
 ## Features
-- [x] AutoMod (spam and rule enforcement)  
+- [x] AutoMod (spam and profanity filtering)  
 - [x] Information commands  
 - [x] Manager tools  
 - [x] Miscellaneous utilities  
