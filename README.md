@@ -28,4 +28,7 @@ If you want to run your own Discord bot, please build it yourself instead of usi
 
 ## Disclaimer
 Kurumi is an independent project and is **not affiliated with, supported by, or endorsed by Discord Inc.**  
-All trademarks and copyrights related to Discord are owned by their respective owners.
+All trademarks and copyrights related to Discord are owned by their respective owners.  
+
+All anime characters and artwork shown are the property of their respective creators.  
+Used here for non-commercial, portfolio purposes only.
