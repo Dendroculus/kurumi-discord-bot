@@ -13,7 +13,7 @@ It focuses on moderation, automation, and useful utilities for server management
 - [x] Moderator tools  
 
 ## Roadmap
-- Add more useful and fun commands (currently **34**)
+- Add more useful and fun commands (currently **35**)
 - Improve modularity with more cogs  
 - Add advanced moderation options  
 
