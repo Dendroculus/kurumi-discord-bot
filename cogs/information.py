@@ -3,6 +3,7 @@ import time
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button
+import os
 
 # Track when bot starts
 start_time = time.time()
@@ -183,9 +184,8 @@ class Information(commands.Cog):
         embed.add_field(name="🌐 Servers", value=f"{len(self.bot.guilds)}", inline=True)
         embed.add_field(name="⏱️ Uptime", value=uptime_str, inline=True)
 
-        embed.set_footer(text="Kurumi is always watching...")
+        file = discord.File(os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi.gif"), filename="kurumi.gif")
 
-        file = discord.File("assets/kurumi.gif", filename="kurumi.gif")
         await ctx.send(file=file, embed=embed)
 
         
