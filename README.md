@@ -12,10 +12,10 @@ It focuses on moderation, automation, and useful utilities for server management
 - [x] Miscellaneous utilities  
 - [x] Moderator tools  
 
-## Roadmap
-- Add more useful and fun commands (currently **35**)
-- Improve modularity with more cogs  
-- Add advanced moderation options  
+## Status
+- Kurumi has reached its **final version**. 
+- The bot is feature-complete with **35 commands**. 
+- No new commands will be added, but minor improvements and maintenance may still occur.
 
 ---
 
