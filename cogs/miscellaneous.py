@@ -4,6 +4,8 @@ from discord import app_commands
 from discord.ui import View, Select
 import aiohttp
 
+ANILIST_API = "https://graphql.anilist.co"
+
 class Misc(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -40,87 +42,143 @@ class Misc(commands.Cog):
                 else:
                     await ctx.send("❌ Couldn't fetch a dog right now.", ephemeral=True)
                     
-    @commands.hybrid_command(name="anime", help="Miscellaneous: Search for an anime by name")
+    @commands.hybrid_command(name="anime", help="Search for an anime by name (AniList)")
     @commands.guild_only()
     async def anime(self, ctx: commands.Context, *, query: str):
-        """Fetch anime info from MyAnimeList via Jikan API"""
+        """Fetch anime info from AniList GraphQL API"""
+
+        query_str = """
+        query ($search: String) {
+        Page(perPage: 5) {
+            media(search: $search, type: ANIME) {
+            id
+            title {
+                romaji
+                english
+                native
+            }
+            description(asHtml: false)
+            episodes
+            status
+            duration
+            startDate { year month day }
+            endDate { year month day }
+            season
+            averageScore
+            popularity
+            favourites
+            format
+            source
+            studios(isMain: true) {
+                nodes {
+                name
+                }
+            }
+            genres
+            coverImage {
+                large
+                medium
+            }
+            bannerImage
+            siteUrl
+            }
+        }
+        }
+        """
+
+        variables = {"search": query}
+
         async with aiohttp.ClientSession() as session:
-            url = f"https://api.jikan.moe/v4/anime?q={query}&limit=5"
-            async with session.get(url) as resp:
+            async with session.post(ANILIST_API, json={"query": query_str, "variables": variables}) as resp:
                 if resp.status != 200:
                     return await ctx.send("❌ Could not fetch anime info right now.")
                 data = await resp.json()
-                results = data.get("data")
-                if not results:
-                    return await ctx.send(f"❌ No results found for `{query}`.")
 
-                # Build select menu options
-                options = []
-                for anime in results:
-                    title = anime.get("title")
-                    episodes = anime.get("episodes", "N/A")
-                    season = anime.get("season") or "N/A"
-                    options.append(discord.SelectOption(
-                        label=title[:100],
-                        description=f"Episodes: {episodes} | Season: {season}"[:100],
-                        value=str(anime["mal_id"])
-                    ))
+        results = data.get("data", {}).get("Page", {}).get("media", [])
+        if not results:
+            return await ctx.send(f"❌ No results found for `{query}`.")
 
-                async def select_callback(interaction: discord.Interaction):
-                    mal_id = interaction.data["values"][0]
-                    anime_data = next(a for a in results if str(a["mal_id"]) == mal_id)
+        # Build select menu options
+        options = []
+        for anime in results:
+            title = anime["title"]["english"] or anime["title"]["romaji"]
+            episodes = anime.get("episodes") or "N/A"
+            season = anime.get("season") or "N/A"
+            options.append(discord.SelectOption(
+                label=title[:100],
+                description=f"Episodes: {episodes} | Season: {season}"[:100],
+                value=str(anime["id"])
+            ))
 
-                    # Info
-                    synopsis = anime_data.get("synopsis") or "No synopsis available."
-                    if len(synopsis) > 4096:
-                        synopsis = synopsis[:4093] + "..."
+        async def select_callback(interaction: discord.Interaction):
+            anime_id = int(interaction.data["values"][0])
+            anime_data = next(a for a in results if a["id"] == anime_id)
 
-                    title = anime_data.get("title")
-                    url = anime_data.get("url")
+            title = anime_data["title"]["english"] or anime_data["title"]["romaji"]
+            url = anime_data.get("siteUrl")
+            description = anime_data.get("description") or "No description available."
+            description = description.replace("<br>", "\n").replace("<i>", "").replace("</i>", "")
+            if len(description) > 4096:
+                description = description[:4093] + "..."
 
-                    embed = discord.Embed(
-                        title=title,
-                        url=url,
-                        description=synopsis,
-                        color=discord.Color.blurple()
-                    )
+            embed = discord.Embed(
+                title=title,
+                url=url,
+                description=description,
+                color=discord.Color.blurple()
+            )
 
-                    # Thumbnail (small top-right)
-                    image_url = anime_data.get("images", {}).get("jpg", {}).get("image_url")
-                    if image_url:
-                        embed.set_thumbnail(url=image_url)
+            # Small thumbnail
+            if anime_data.get("coverImage", {}).get("medium"):
+                embed.set_thumbnail(url=anime_data["coverImage"]["medium"])
 
-                    # Big banner (bottom image)
-                    banner_url = anime_data.get("images", {}).get("jpg", {}).get("large_image_url")
-                    if banner_url:
-                        embed.set_image(url=banner_url)
+            # Banner image
+            if anime_data.get("bannerImage"):
+                embed.set_image(url=anime_data["bannerImage"])
 
-                    # Fields (like AniList)
-                    embed.add_field(name="Episodes", value=anime_data.get("episodes", "N/A"), inline=True)
-                    embed.add_field(name="Status", value=anime_data.get("status", "N/A"), inline=True)
-                    embed.add_field(name="Aired", value=f"{anime_data.get('aired', {}).get('string', 'N/A')}", inline=True)
+            # Fields (AniList style)
+            embed.add_field(name="Episodes", value=anime_data.get("episodes", "N/A"), inline=True)
+            embed.add_field(name="Status", value=anime_data.get("status", "N/A").title(), inline=True)
 
-                    embed.add_field(name="Studio", value=anime_data.get("studios", [{}])[0].get("name", "N/A"), inline=True)
-                    embed.add_field(name="Source", value=anime_data.get("source", "N/A"), inline=True)
-                    embed.add_field(name="Score", value=anime_data.get("score", "N/A"), inline=True)
+            # Dates
+            start = anime_data.get("startDate", {})
+            end = anime_data.get("endDate", {})
+            start_str = f"{start.get('year','N/A')}-{start.get('month','??')}-{start.get('day','??')}" if start.get("year") else "N/A"
+            end_str = f"{end.get('year','N/A')}-{end.get('month','??')}-{end.get('day','??')}" if end.get("year") else "N/A"
+            embed.add_field(name="Start Date", value=start_str, inline=True)
+            embed.add_field(name="End Date", value=end_str, inline=True)
 
-                    # Genres
-                    genres = ", ".join([g["name"] for g in anime_data.get("genres", [])]) or "N/A"
-                    embed.add_field(name="Genres", value=genres, inline=False)
+            embed.add_field(name="Duration", value=f"{anime_data.get('duration', 'N/A')} min/ep", inline=True)
+            embed.add_field(name="Studio", value=anime_data["studios"]["nodes"][0]["name"] if anime_data["studios"]["nodes"] else "N/A", inline=True)
+            embed.add_field(name="Source", value=anime_data.get("source", "N/A"), inline=True)
 
-      
-                    embed.set_footer(
-                    text="Powered by Jikan API",
-                    icon_url="https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png"
-                    )
-                    await interaction.response.edit_message(embed=embed, view=None)
+            embed.add_field(name="Score", value=f"{anime_data.get('averageScore', 'N/A')}%", inline=True)
+            embed.add_field(name="Popularity", value=str(anime_data.get("popularity", "N/A")), inline=True)
+            embed.add_field(name="Favourites", value=str(anime_data.get("favourites", "N/A")), inline=True)
 
-                select = Select(placeholder="Choose an anime...", options=options)
-                select.callback = select_callback
-                view = View()
-                view.add_item(select)
+            # Genres
+            genres = anime_data.get("genres", [])
+            if genres:
+                genres = " ".join(f"`{g}`" for g in genres)
+            else:
+                genres = "N/A"
 
-                await ctx.send("Select an anime from the search results:", view=view)
+            embed.add_field(name="Genres", value=genres, inline=False)
+
+            # Credits
+            embed.set_footer(
+                text="Provided by AniList",
+                icon_url="https://anilist.co/img/icons/android-chrome-512x512.png"
+            )
+
+            await interaction.response.edit_message(embed=embed, view=None)
+
+        select = Select(placeholder="Choose an anime...", options=options)
+        select.callback = select_callback
+        view = View()
+        view.add_item(select)
+
+        await ctx.send("Select an anime from the search results:", view=view)
                 
     @commands.hybrid_command(name="animecharacter", help="Miscellaneous: Search for an anime character by name")
     @app_commands.describe(query="The name of the anime character to search for")
@@ -135,108 +193,109 @@ class Misc(commands.Cog):
                 if not results:
                     return await ctx.send(f"❌ No results found for `{query}`.")
 
-                options = []
-                for char in results:
-                    name = char.get("name")
-                    kanji = char.get("name_kanji") or "N/A"
-                    options.append(discord.SelectOption(
-                        label=name[:100],
-                        description=f"Kanji: {kanji}"[:100],
-                        value=str(char["mal_id"])
-                    ))
+            options = []
+            for char in results:
+                name = char.get("name")
+                kanji = char.get("name_kanji") or "N/A"
+                options.append(discord.SelectOption(
+                    label=name[:100],
+                    description=f"Kanji: {kanji}"[:100],
+                    value=str(char["mal_id"])
+                ))
 
-                async def select_callback(interaction: discord.Interaction):
-                    mal_id = interaction.data["values"][0]
+            async def select_callback(interaction: discord.Interaction):
+                mal_id = interaction.data["values"][0]
 
-                    # Fetch full details
-                    async with aiohttp.ClientSession() as session2:
-                        detail_url = f"https://api.jikan.moe/v4/characters/{mal_id}/full"
-                        async with session2.get(detail_url) as resp2:
-                            if resp2.status != 200:
-                                return await interaction.response.send_message("❌ Could not fetch details.", ephemeral=True)
-                            char_data = (await resp2.json()).get("data", {})
+                # Fetch full details
+                async with aiohttp.ClientSession() as session2:
+                    detail_url = f"https://api.jikan.moe/v4/characters/{mal_id}/full"
+                    async with session2.get(detail_url) as resp2:
+                        if resp2.status != 200:
+                            return await interaction.response.send_message("❌ Could not fetch details.", ephemeral=True)
+                        char_data = (await resp2.json()).get("data", {})
 
-                    name = char_data.get("name")
-                    kanji = char_data.get("name_kanji") or "N/A"
-                    about = char_data.get("about") or ""
+                name = char_data.get("name")
+                kanji = char_data.get("name_kanji") or "N/A"
+                about = char_data.get("about") or ""
 
-                    # Smart truncation at nearest period before 300 chars
-                    desc = about.strip().replace("\n", " ")
-                    if len(desc) > 300:
-                        cutoff = desc[:300].rfind(".")
-                        if cutoff != -1:
-                            desc = desc[:cutoff+1]  # keep the period
-                        else:
-                            desc = desc[:300] + "..."
+                # Remove repeated info lines from about
+                cleaned_lines = []
+                for line in about.split("\n"):
+                    lower_line = line.lower()
+                    if any(k in lower_line for k in ["age:", "height:", "birthday:", "hair color:", "eye color:"]):
+                        continue
+                    cleaned_lines.append(line.strip())
+                desc = " ".join(cleaned_lines)
+                desc = desc.replace("<br>", " ").replace("<i>", "").replace("</i>", "")
+                if len(desc) > 300:
+                    cutoff = desc[:300].rfind(".")
+                    desc = desc[:cutoff+1] if cutoff != -1 else desc[:300] + "..."
 
-                    # Extract details
-                    fields = {}
-                    for line in about.split("\n"):
-                        if ":" in line:
-                            key, val = line.split(":", 1)
-                            key, val = key.strip().lower(), val.strip()
-                            if key in ["age", "birthday", "zodiac", "height", "hobbies"]:
-                                fields[key.capitalize()] = val
+                # Extract info fields
+                fields = {}
+                for line in about.split("\n"):
+                    if ":" in line:
+                        key, val = line.split(":", 1)
+                        key, val = key.strip().lower(), val.strip()
+                        if key in ["age", "birthday", "height", "hair color"]:
+                            fields[key.capitalize()] = val
 
-                    # Voice Actor
-                    seiyuu = "N/A"
-                    for v in char_data.get("voices", []):
-                        if v.get("language") == "Japanese":
-                            seiyuu = v["person"]["name"]
-                            break
+                # Voice Actor
+                seiyuu = "N/A"
+                for v in char_data.get("voices", []):
+                    if v.get("language") == "Japanese":
+                        seiyuu = v["person"]["name"]
+                        break
 
-                    # Anime appearances
-                    anime_list = [a["anime"]["title"] for a in char_data.get("anime", [])]
-                    anime_tags = ""
-                    if anime_list:
-                        anime_tags = " ".join([f"`{a}`" for a in anime_list[:4]])
-                        if len(anime_list) > 4:
-                            anime_tags += " ..."
-                    else:
-                        anime_tags = "`N/A`"
+                # Anime appearances
+                anime_list = [a["anime"]["title"] for a in char_data.get("anime", [])]
+                anime_tags = ""
+                if anime_list:
+                    anime_tags = " ".join([f"`{a}`" for a in anime_list[:4]])
+                    if len(anime_list) > 4:
+                        anime_tags += " ..."
+                else:
+                    anime_tags = "`N/A`"
 
-                    image_url = char_data.get("images", {}).get("jpg", {}).get("image_url")
+                image_url = char_data.get("images", {}).get("jpg", {}).get("image_url")
 
-                    # AniList-style embed
-                    embed = discord.Embed(
-                        title=name,
-                        description=desc,
-                        color=discord.Color.blurple()
-                    )
+                # Build embed
+                embed = discord.Embed(
+                    title=name,
+                    description=desc,
+                    color=discord.Color.blurple()
+                )
+                if image_url:
+                    embed.set_thumbnail(url=image_url)
 
-                    # Small thumbnail top right
-                    if image_url:
-                        embed.set_thumbnail(url=image_url)
+                info_left = ""
+                if "Age" in fields: info_left += f"**Age:** {fields['Age']}\n"
+                if "Height" in fields: info_left += f"**Height:** {fields['Height']}\n"
+                if "Birthday" in fields: info_left += f"**Birthday:** {fields['Birthday']}\n"
+                if "Hair color" in fields: info_left += f"**Hair Color:** {fields['Hair color']}\n"
 
-                    # Info block like AniList
-                    info_left = ""
-                    if "Age" in fields: info_left += f"**Age:** {fields['Age']}\n"
-                    if "Height" in fields: info_left += f"**Height:** {fields['Height']}\n"
-                    if "Birthday" in fields: info_left += f"**Birthday:** {fields['Birthday']}\n"
+                info_right = f"**Kanji:** {kanji}\n**Seiyuu:** {seiyuu}\n"
 
-                    info_right = f"**Kanji:** {kanji}\n**Seiyuu:** {seiyuu}\n"
+                if info_left:
+                    embed.add_field(name="Info", value=info_left, inline=True)
+                if info_right:
+                    embed.add_field(name="Details", value=info_right, inline=True)
 
-                    if info_left:
-                        embed.add_field(name="Info", value=info_left, inline=True)
-                    if info_right:
-                        embed.add_field(name="Details", value=info_right, inline=True)
+                embed.add_field(name="📺 Anime Appearances", value=anime_tags, inline=False)
 
-                    # Anime tags at bottom like genres
-                    embed.add_field(name="📺 Anime Appearances", value=anime_tags, inline=False)
+                embed.set_footer(
+                    text="Provided by Jikan API • MyAnimeList",
+                    icon_url="https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png"
+                )
 
-                    # Footer with MAL icon
-                    embed.set_footer(
-                        text="Provided by Jikan API • MyAnimeList",
-                        icon_url="https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png"
-                    )
+                await interaction.response.edit_message(embed=embed, view=None)
 
-                    await interaction.response.edit_message(embed=embed, view=None)
+            select = Select(placeholder="Choose a character...", options=options)
+            select.callback = select_callback
+            view = View()
+            view.add_item(select)
+            await ctx.send("🔎 Select a character from the search results:", view=view)
 
-                select = Select(placeholder="Choose a character...", options=options)
-                select.callback = select_callback
-                view = View()
-                view.add_item(select)
-                await ctx.send("🔎 Select a character from the search results:", view=view)
 
 
 async def setup(bot):
