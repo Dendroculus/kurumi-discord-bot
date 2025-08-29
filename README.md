@@ -38,6 +38,9 @@ Used here for non-commercial, portfolio purposes only.
 The chibi character artwork featured in this project is created by [@pypy_nemui](https://x.com/pypy_nemui/status/1130490628096217088). Used here solely for non-commercial, portfolio purposes.
 
 ## Data Source
-Anime information is provided via the [Jikan API](https://jikan.moe/), a free MyAnimeList API.
+Anime information is provided via <a href="https://anilist.co/"><img src="https://anilist.co/img/icons/android-chrome-512x512.png" width="16" /></a> AniList API.<br>
+Anime character information is provided via <a href="https://jikan.moe/"><img src="https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png" width="16" /></a> Jikan API.
+
+
 
 
