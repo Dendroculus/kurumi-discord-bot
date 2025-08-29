@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from better_profanity import profanity
+import os
 
 class Events(commands.Cog):
     def __init__(self, bot):
@@ -23,9 +24,9 @@ class Events(commands.Cog):
         channel = discord.utils.get(member.guild.text_channels, name="💬general")
         if not channel:
             return
-
+        file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi1.gif")
         try:
-            with open("assets/kurumi1.gif", "rb") as f:
+            with open(file_path, "rb") as f:
                 file = discord.File(f, filename="kurumi1.gif")
                 embed = discord.Embed(
                     title="💖 Welcome!",
@@ -46,8 +47,9 @@ class Events(commands.Cog):
 
         # DMs
         if message.guild is None:
+            file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi3.gif")
             try:
-                with open("assets/kurumi3.gif", "rb") as gif:
+                with open(file_path, "rb") as gif:
                     file = discord.File(gif, filename="kurumi3.gif")
                     embed = discord.Embed(
                         title="Private Server Only",
@@ -68,8 +70,9 @@ class Events(commands.Cog):
 
         # Mention without reply
         if self.bot.user.mentioned_in(message) and not message.reference:
+            file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi2.gif")
             try:
-                with open("assets/kurumi2.gif", "rb") as gif:
+                with open(file_path, "rb") as gif:
                     file = discord.File(gif, filename="kurumi2.gif")
                     embed = discord.Embed(
                         description="Hello there, how can I help you today Master? ✨",
@@ -107,7 +110,7 @@ class Events(commands.Cog):
             return False
         return True
 
-
+    
 async def setup(bot):
     await bot.add_cog(Events(bot))
     print("📦 Loaded Events cog.")
