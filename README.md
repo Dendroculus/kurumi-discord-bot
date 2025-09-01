@@ -20,9 +20,8 @@ It focuses on moderation, automation, and useful utilities for server management
 ---
 
 ## License
-This repository is public for viewing only.  
-No license is provided, so you are **not allowed** to copy, modify, or redistribute this code.  
-If you want to run your own Discord bot, please build it yourself instead of using this codebase.
+This project is licensed under the **MIT License** — you are free to use, modify, and distribute it, provided that proper credit is given.  
+See the [LICENSE](LICENSE) file for details.  
 
 ---
 
