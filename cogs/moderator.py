@@ -148,8 +148,7 @@ class Moderator(commands.Cog):
         channel_name = target_channel.name
 
         if target_channel != ctx.channel:
-            await ctx.send(f"🗑️ Channel `{channel_name}` deleted.")
-
+            await ctx.send(f"🗑️ Channel `{channel_name}` deleted.", ephemeral=True)
         try:
             await ctx.author.send(f"You deleted the channel `{channel_name}`.")
         except discord.Forbidden:
@@ -157,13 +156,7 @@ class Moderator(commands.Cog):
                 await ctx.send("❌ Could not send you a DM.")
 
         await target_channel.delete()
-
-        if target_channel == ctx.channel:
-            try:
-                await ctx.author.send(f"Channel `{channel_name}` deleted.")
-            except discord.Forbidden:
-                pass
-
+        
     @commands.hybrid_command(name="createchannel", help="Moderator:Create a new channel")
     @commands.has_permissions(manage_channels=True)
     async def createchannel(self, ctx: commands.Context, name: str, category: discord.CategoryChannel = None):
