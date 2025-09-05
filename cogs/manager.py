@@ -296,6 +296,19 @@ class Manager(commands.Cog):
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to edit that role.")
 
+
+    @commands.hybrid_command(name="renamechannel", help="Manager: Rename a channel")
+    @commands.has_permissions(manage_channels=True)
+    @app_commands.describe(channel="The channel to rename", new_name="The new name for the channel")
+    async def renamechannel(self, ctx:commands.Context, channel: discord.TextChannel, *, new_name: str):
+        try:
+            await channel.edit(name=new_name)
+            await ctx.send(f"✏️ Renamed channel to `{new_name}`.")
+        except discord.Forbidden:
+            await ctx.send("❌ I don't have permission to edit that channel.")
+
+
 async def setup(bot):
     await bot.add_cog(Manager(bot))
+
     print("📦 Loaded manager cog.")
