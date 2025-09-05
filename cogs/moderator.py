@@ -165,6 +165,19 @@ class Moderator(commands.Cog):
         await ctx.send(f"✅ Channel `{new_channel.name}` created in `{target_category.name if target_category else 'No Category'}`.")
 
 
+    @commands.hybrid_command(name="clearchat", help="Moderator: Clear chats of the current channel")
+    @commands.has_permissions(manage_messages=True)
+    @app_commands.describe(limit="Number of messages to clear")
+    async def clearchat(self, ctx: commands.Context, limit: int = 100):
+        if limit > 100 : 
+            limit = 100
+        
+        await ctx.defer(ephemeral=True)
+        deleted = await ctx.channel.purge(limit=limit)
+        await ctx.send(f"🧹 Cleared {len(deleted)} messages.", delete_after=5)
+
+
 async def setup(bot):
     await bot.add_cog(Moderator(bot))
     print("📦 Loaded moderator cog.")
+
