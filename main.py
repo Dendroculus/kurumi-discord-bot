@@ -1,9 +1,6 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
-from better_profanity import profanity
 import time
-import aiohttp
 import os
 from dotenv import load_dotenv
 
@@ -32,17 +29,19 @@ class KurumiBot(commands.Bot):
             "cogs.moderator",
             "cogs.miscellaneous",
             "cogs.manager",
-            "cogs.events"
+            "cogs.events",
+            "cogs.errors"
         ]
         for ext in extensions:
             try:
                 await self.load_extension(ext)  
             except Exception as e:
                 print(f"❌ Failed to load extension {ext}: {e}")
-
-bot = KurumiBot()
     
-
+if __name__ == '__main__':
+    bot = KurumiBot()
+    
+    
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 bot.run(TOKEN)
