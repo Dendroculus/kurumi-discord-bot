@@ -86,31 +86,8 @@ class Events(commands.Cog):
 
         await self.bot.process_commands(message)
 
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx, error):
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("🚫 You don't have permission to use this command.")
-        elif isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send(f"❌ Missing argument: `{error.param.name}`.")
-        elif isinstance(error, commands.BadArgument):
-            await ctx.send("❌ Invalid argument. Check your input.")
-        elif isinstance(error, commands.CommandNotFound):
-            await ctx.send("❌ Unknown command. Use `!commands` to see available commands.")
-        elif isinstance(error, commands.HybridCommandError) and isinstance(error.original, app_commands.CommandInvokeError):
-            await ctx.send("❌ An error occurred with this slash command.")
-            print(error.original.original)
-        else:
-            print(f"Unhandled error in '{ctx.command}': {error}")
-            await ctx.send("❌ An unexpected error occurred.")
-
-    @commands.Cog.listener()
-    async def block_dms(self, ctx: commands.Context):
-        if ctx.guild is None:
-            await ctx.send("❌ This bot can only be used in servers.")
-            return False
-        return True
-
     
 async def setup(bot):
     await bot.add_cog(Events(bot))
     print("📦 Loaded Events cog.")
+
