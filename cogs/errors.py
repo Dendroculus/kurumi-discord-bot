@@ -1,7 +1,17 @@
 from discord.ext import commands
 from discord import app_commands, Interaction
 
+class ErrorHandler(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
 handled_errors = set()
+
+def make_key(ctx_or_interaction, is_slash=False):
+    guild_id = ctx_or_interaction.guild.id if ctx_or_interaction.guild else 0
+    user_id = ctx_or_interaction.user.id if is_slash else ctx_or_interaction.author.id
+    command_name = str(ctx_or_interaction.command) if is_slash else str(ctx_or_interaction.command)
+    return (guild_id, user_id, command_name, is_slash)  # include is_slash to separate domains
 
 class ErrorHandler(commands.Cog):
     def __init__(self, bot):
@@ -9,44 +19,49 @@ class ErrorHandler(commands.Cog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
-        key = (ctx.guild.id if ctx.guild else 0, ctx.author.id, str(ctx.command))
+        key = make_key(ctx, is_slash=False)
         if key in handled_errors:
             return
         handled_errors.add(key)
 
         if isinstance(error, commands.HybridCommandError):
-            return  # let slash error handle it
+            return  
 
         if isinstance(error, commands.MissingPermissions):
-            await ctx.send("🚫 You don't have permission to use this command.")
+            await ctx.send("🚫 You don't have permission.")
         elif isinstance(error, commands.MissingRequiredArgument):
             await ctx.send(f"❌ Missing argument: `{error.param.name}`.")
         elif isinstance(error, commands.BadArgument):
-            await ctx.send("❌ Invalid argument. Check your input.")
+            await ctx.send("❌ Invalid argument.")
         elif isinstance(error, commands.CommandNotFound):
             if not ctx.message.content.startswith("/"):
-                await ctx.send("❌ Unknown command. Use `!commands` to see available commands.")
+                await ctx.send("❌ Unknown command.")
         else:
-            print(f"Unhandled error in '{ctx.command}': {error}")
-            await ctx.send("❌ An unexpected error occurred.")
+            await ctx.send("❌ Unexpected error.")
+            print(error)
+
+        handled_errors.remove(key)  
 
     @commands.Cog.listener()
     async def on_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError):
-        key = (interaction.guild.id if interaction.guild else 0, interaction.user.id, str(interaction.command))
+        key = make_key(interaction, is_slash=True)
         if key in handled_errors:
             return
         handled_errors.add(key)
 
         if isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=True)
+            await interaction.response.send_message("🚫 You don't have permission.", ephemeral=True)
         elif isinstance(error, app_commands.CommandInvokeError):
-            await interaction.response.send_message("❌ Something went wrong with this slash command.", ephemeral=True)
+            await interaction.response.send_message("❌ Something went wrong.", ephemeral=True)
             print(error.original)
         elif isinstance(error, app_commands.TransformerError):
-            await interaction.response.send_message("❌ Invalid argument. Check your input.", ephemeral=True)
+            await interaction.response.send_message("❌ Invalid argument.", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ An unexpected slash command error occurred.", ephemeral=True)
+            await interaction.response.send_message("❌ Unexpected slash command error.", ephemeral=True)
             print(error)
+
+        handled_errors.remove(key)  
+
 
 async def setup(bot):
     await bot.add_cog(ErrorHandler(bot))
