@@ -86,8 +86,13 @@ class Events(commands.Cog):
 
         await self.bot.process_commands(message)
 
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        return
+
     
 async def setup(bot):
     await bot.add_cog(Events(bot))
     print("📦 Loaded Events cog.")
+
 
