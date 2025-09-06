@@ -1,9 +1,6 @@
 from discord.ext import commands
 from discord import app_commands, Interaction
 
-class ErrorHandler(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
 
 handled_errors = set()
 
@@ -66,3 +63,4 @@ class ErrorHandler(commands.Cog):
 async def setup(bot):
     await bot.add_cog(ErrorHandler(bot))
     print("📦 Loaded error handler cog.")
+
