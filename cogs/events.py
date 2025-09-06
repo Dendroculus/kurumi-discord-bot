@@ -7,12 +7,13 @@ import os
 class Events(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self._last_member = None
 
     @commands.Cog.listener()
     async def on_ready(self):
         await self.bot.change_presence(activity=discord.CustomActivity(name="ara ara konnichiwa"))
-        print(f'✅ Logged in as {self.bot.user}')
-
+        print(f"✅ Logged in as {self.bot.user}")
+        
         try:
             synced = await self.bot.tree.sync()
             print(f"🔄 Synced {len(synced)} slash commands.")
@@ -21,9 +22,10 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
-        channel = discord.utils.get(member.guild.text_channels, name="💬general")
+        channel = discord.utils.get(member.guild.text_channels, name="💬-general")
         if not channel:
             return
+            
         file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi1.gif")
         try:
             with open(file_path, "rb") as f:
@@ -45,6 +47,11 @@ class Events(commands.Cog):
         if message.author.bot:
             return
 
+        # Check if message is a command
+        ctx = await self.bot.get_context(message)
+        if ctx.valid:
+            return
+
         # DMs
         if message.guild is None:
             file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi3.gif")
@@ -62,13 +69,11 @@ class Events(commands.Cog):
                 pass
             return
 
-        # Profanity
         if profanity.contains_profanity(message.content):
             await message.delete()
             await message.channel.send(f"🚫 {message.author.mention}, watch your language!", delete_after=5)
             return
 
-        # Mention without reply
         if self.bot.user.mentioned_in(message) and not message.reference:
             file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi2.gif")
             try:
@@ -84,15 +89,6 @@ class Events(commands.Cog):
                 await message.channel.send("Hello there, how can I help you today Master? ✨ (Image not found)")
             return
 
-        await self.bot.process_commands(message)
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        return
-
-    
 async def setup(bot):
     await bot.add_cog(Events(bot))
-    print("📦 Loaded Events cog.")
-
-
+    print("📦 Loaded events cog.")
