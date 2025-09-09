@@ -91,10 +91,12 @@ class Information(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(name="membercount", help="Information:Shows total member count in the server")
+    @commands.guild_only()
     async def membercount(self, ctx: commands.Context):
         await ctx.send(f"👥 This server has **{ctx.guild.member_count}** members.")
         
     @commands.hybrid_command(name="serverstats", help="Information:Shows server statistics")
+    @commands.guild_only()
     async def serverstats(self, ctx: commands.Context):
         guild = ctx.guild
         embed = discord.Embed(title=f"📊 Server Stats — {guild.name}", color=discord.Color.purple())
@@ -109,6 +111,7 @@ class Information(commands.Cog):
         await ctx.send(embed=embed)
         
     @commands.hybrid_command(name="member", help="Information:List members in a role (max 90)")
+    @commands.guild_only()
     @app_commands.describe(role="The role to list members from")
     async def member(self, ctx: commands.Context, role: discord.Role):
         if not role.members:
@@ -175,7 +178,7 @@ class Information(commands.Cog):
             description="Your personal assistant with a yandere twist.",
             color=discord.Color.purple()
         )
-        embed.set_thumbnail(url="attachment://kurumi.gif")  # assuming you send gif file
+        embed.set_thumbnail(url="attachment://kurumi.gif")  
 
         embed.add_field(name="🆔 Bot Name", value=self.bot.user.name, inline=True)
         embed.add_field(name="📌 ID", value=self.bot.user.id, inline=True)
