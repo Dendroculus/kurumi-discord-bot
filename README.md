@@ -30,7 +30,8 @@ Kurumi is an independent project and is **not affiliated with, supported by, or 
 All trademarks and copyrights related to Discord are owned by their respective owners.  
 
 All anime characters and artwork shown are the property of their respective creators.  
-Used here for non-commercial, portfolio purposes only.
+Used here for non-commercial, portfolio purposes only. <br><br>
+⚠️ GIF files are not included. Please place kurumi.gif (and others if needed) in the assets/ folder before using commands that has GIF outputs.
 
 ## Artwork Attribution
 
