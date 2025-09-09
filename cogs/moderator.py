@@ -10,6 +10,7 @@ class Moderator(commands.Cog):
             bot.warnings = defaultdict(int)
 
     @commands.hybrid_command(name="nuke", help="Moderator:Nuke the current channel (delete & recreate)")
+    @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     @app_commands.describe(channel="The channel to nuke. Defaults to the current channel.")
     async def nuke(self, ctx: commands.Context, channel: discord.TextChannel = None):
@@ -28,6 +29,7 @@ class Moderator(commands.Cog):
         await new_channel.send(embed=embed)
 
     @commands.hybrid_command(name="mute", help="Moderator:Mute a member (adds 'Muted' role)")
+    @commands.guild_only()
     @commands.has_permissions(manage_roles=True)
     @app_commands.describe(member="The member to mute", reason="The reason for the mute")
     async def mute(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
@@ -41,6 +43,7 @@ class Moderator(commands.Cog):
         await ctx.send(f"🔇 {member.mention} has been muted. Reason: {reason}")
 
     @commands.hybrid_command(name="unmute", help="Moderator:Unmute a member")
+    @commands.guild_only()
     @commands.has_permissions(manage_roles=True)
     @app_commands.describe(member="The member to unmute")
     async def unmute(self, ctx: commands.Context, member: discord.Member):
@@ -52,6 +55,7 @@ class Moderator(commands.Cog):
             await ctx.send("❌ User is not muted.")
 
     @commands.hybrid_command(name="kick", help="Moderator:Kick a member")
+    @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     @app_commands.describe(member="The member to kick", reason="The reason for the kick")
     async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
@@ -59,6 +63,7 @@ class Moderator(commands.Cog):
         await ctx.send(f"👢 {member.mention} has been kicked. Reason: {reason}")
 
     @commands.hybrid_command(name="ban", help="Moderator:Ban a member")
+    @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     @app_commands.describe(member="The member to ban", reason="The reason for the ban")
     async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
@@ -66,6 +71,7 @@ class Moderator(commands.Cog):
         await ctx.send(f"🔨 {member.mention} has been banned. Reason: {reason}")
 
     @commands.hybrid_command(name="warn", help="Moderator:Warn a user. 3 warnings will result in a kick")
+    @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(member="The member to warn", reason="The reason for the warning")
     async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
@@ -94,6 +100,7 @@ class Moderator(commands.Cog):
 
 
     @commands.hybrid_command(name="unban", help="Moderator:Unban a user by ID or username#discriminator")
+    @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     @app_commands.describe(user="The ID or username#discriminator of the user to unban")
     async def unban(self, ctx: commands.Context, *, user: str):
@@ -127,6 +134,7 @@ class Moderator(commands.Cog):
 
 
     @commands.hybrid_command(name="lock", help="Moderator:Lock the current channel")
+    @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     async def lock(self, ctx: commands.Context):
         overwrite = ctx.channel.overwrites_for(ctx.guild.default_role)
@@ -136,12 +144,14 @@ class Moderator(commands.Cog):
         await ctx.send("🔒 Channel is now locked and hidden from @everyone.")
 
     @commands.hybrid_command(name="unlock", help="Moderator:Unlock the current channel")
+    @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     async def unlock(self, ctx: commands.Context):
         await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
         await ctx.send("🔓 Channel is now unlocked.")
 
     @commands.hybrid_command(name="deletechannel", help="Moderator:Delete a channel")
+    @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     async def deletechannel(self, ctx: commands.Context, channel: discord.TextChannel = None):
         target_channel = channel or ctx.channel
@@ -158,14 +168,15 @@ class Moderator(commands.Cog):
         await target_channel.delete()
         
     @commands.hybrid_command(name="createchannel", help="Moderator:Create a new channel")
+    @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     async def createchannel(self, ctx: commands.Context, name: str, category: discord.CategoryChannel = None):
         target_category = category or ctx.channel.category
         new_channel = await ctx.guild.create_text_channel(name=name, category=target_category)
         await ctx.send(f"✅ Channel `{new_channel.name}` created in `{target_category.name if target_category else 'No Category'}`.")
-
-
+        
     @commands.hybrid_command(name="clearchat", help="Moderator: Clear chats of the current channel")
+    @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(limit="Number of messages to clear")
     async def clearchat(self, ctx: commands.Context, limit: int = 100):
@@ -180,4 +191,3 @@ class Moderator(commands.Cog):
 async def setup(bot):
     await bot.add_cog(Moderator(bot))
     print("📦 Loaded moderator cog.")
-
