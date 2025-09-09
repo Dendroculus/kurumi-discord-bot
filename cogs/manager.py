@@ -4,6 +4,54 @@ from discord import app_commands, ui, Interaction
 from datetime import timedelta
 import re
 
+class EmojiCreatorView(ui.View):
+    def __init__(self, author: discord.Member):
+        super().__init__(timeout=120)  
+        self.author = author
+
+    @ui.button(label="Upload Emoji", style=discord.ButtonStyle.primary)
+    async def upload_emoji(self, interaction: Interaction, button: ui.Button):
+        if interaction.user != self.author:
+            await interaction.response.send_message("Only the command author can use this button.", ephemeral=True)
+            return
+
+        await interaction.response.send_message("Please upload the image for the emoji now (PNG/JPG/GIF, max 256KB).", ephemeral=True)
+
+        def check(m):
+            return m.author == self.author and m.attachments
+
+        try:
+            msg = await interaction.client.wait_for("message", check=check, timeout=120)
+        except:
+            await interaction.followup.send("Timed out waiting for an attachment.", ephemeral=True)
+            return
+
+        attachment = msg.attachments[0]
+        if attachment.size > 256 * 1024:
+            await interaction.followup.send("File is too large. Max 256KB.", ephemeral=True)
+            return
+
+        await interaction.followup.send("Please type the name for your emoji.", ephemeral=True)
+
+        def name_check(m):
+            return m.author == self.author and len(m.content) > 0
+
+        try:
+            name_msg = await interaction.client.wait_for("message", check=name_check, timeout=60)
+        except:
+            await interaction.followup.send("Timed out waiting for emoji name.", ephemeral=True)
+            return
+
+        emoji_name = name_msg.content
+
+        try:
+            image_bytes = await attachment.read()
+            emoji = await interaction.guild.create_custom_emoji(name=emoji_name, image=image_bytes)
+            await interaction.followup.send(f"Emoji created: <:{emoji.name}:{emoji.id}>")
+        except Exception as e:
+            await interaction.followup.send(f"Failed to create emoji: {e}", ephemeral=True)
+
+
 class InvitePages(ui.View):
     def __init__(self, embeds):
         super().__init__(timeout=None)
@@ -49,6 +97,7 @@ class Manager(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(name="slowmode", help="Manager:Set slowmode for a channel")
+    @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     @app_commands.describe(seconds="The slowmode delay in seconds (0 to disable)", channel="The channel to apply slowmode to")
     async def slowmode(self, ctx: commands.Context, seconds: int, channel: discord.TextChannel = None):
@@ -59,6 +108,7 @@ class Manager(commands.Cog):
         await ctx.send(f"🐢 Slowmode in {target_channel.mention} set to **{seconds}**s.")
 
     @commands.hybrid_command(name="invites", help="Manager:View all active server invites")
+    @commands.guild_only()
     @commands.has_permissions(administrator=True)
     async def invites(self, ctx: commands.Context):
         invites = await ctx.guild.invites()
@@ -79,6 +129,7 @@ class Manager(commands.Cog):
         await ctx.send(embed=embeds[0], view=view)
 
     @commands.hybrid_command(name="createinvite", help="Manager:Create a new invite link")
+    @commands.guild_only()
     @commands.has_permissions(manage_guild=True)
     @app_commands.describe(channel="Channel to create invite for", max_uses="Max uses (0 = unlimited)", max_age="Expiry time in seconds (0 = never)")
     async def createinvite(self, ctx: commands.Context, channel: discord.TextChannel = None, max_uses: int = 0, max_age: int = 0):
@@ -87,6 +138,7 @@ class Manager(commands.Cog):
         await ctx.send(f"✅ Created invite link: {invite.url}")
 
     @commands.hybrid_command(name="deleteinvite", help="Manager:Delete an existing invite link or all invites")
+    @commands.guild_only()
     @commands.has_permissions(manage_guild=True)
     @app_commands.describe(code="Select an invite code or 'all' to delete all invites")
     async def deleteinvite(self, ctx: commands.Context, code: str):
@@ -127,6 +179,7 @@ class Manager(commands.Cog):
             return [app_commands.Choice(name="❌ Error retrieving invites", value="")]
 
     @commands.hybrid_command(name="rolename", help="Manager:Change a role's name")
+    @commands.guild_only()
     @commands.has_permissions(manage_roles=True)
     @app_commands.describe(role="The role to rename", new_name="The new name for the role")
     async def rolename(self, ctx: commands.Context, role: discord.Role, *, new_name: str):
@@ -137,6 +190,7 @@ class Manager(commands.Cog):
             await ctx.send("❌ I don't have permission to edit that role.")
 
     @commands.hybrid_command(name="setnick", help="Manager:Change a member's nickname")
+    @commands.guild_only()
     @commands.has_permissions(manage_nicknames=True)
     @app_commands.describe(member="The member to change the nickname of", nickname="The new nickname for the member")
     async def setnick(self, ctx: commands.Context, member: discord.Member, *, nickname: str):
@@ -146,11 +200,6 @@ class Manager(commands.Cog):
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to change that user's nickname.")
 
-    @commands.hybrid_command(name="modules", help="Manager:List available modules")
-    async def modules(self, ctx: commands.Context):
-        await ctx.send("📦 **Modules:**\n• Moderation\n• Information\n• Manager")
-
-    # helper
     def parse_duration(self, duration_str):
         match = re.fullmatch(r"(\d+)([smhd])", duration_str)
         if not match:
@@ -166,6 +215,7 @@ class Manager(commands.Cog):
             return timedelta(days=value)
 
     @commands.hybrid_command(name="timeout", help="Manager:Timeout a user")
+    @commands.guild_only()
     @commands.has_permissions(moderate_members=True)
     @app_commands.describe(member="Member to timeout", duration="Duration (e.g., 10s, 5m, 1h, 1d)", reason="Reason for timeout")
     async def timeout(self, ctx: commands.Context, member: discord.Member, duration: str, *, reason: str = "No reason provided"):
@@ -191,6 +241,7 @@ class Manager(commands.Cog):
         ]
 
     @commands.hybrid_command(name="addrole", help="Manager:Add a new role or assign it to a user")
+    @commands.guild_only()
     @commands.has_permissions(manage_roles=True)
     @app_commands.describe(role_name="The name of the role to create or assign", member="The member to assign the role to (optional)")
     @app_commands.autocomplete(role_name=role_autocomplete)
@@ -215,6 +266,7 @@ class Manager(commands.Cog):
 
 
     @commands.hybrid_command(name="delrole", help="Manager:Remove a role from members or delete it")
+    @commands.guild_only()
     @commands.has_permissions(manage_roles=True)
     @app_commands.describe(
         role="The role to modify",
@@ -259,6 +311,7 @@ class Manager(commands.Cog):
             await ctx.send(f"An error occurred: {e}")
 
     @commands.hybrid_command(name="listmods", help="Manager:List all moderators")
+    @commands.guild_only()
     async def listmods(self, ctx: commands.Context):
         mod_roles = [role.mention for role in ctx.guild.roles if role.permissions.manage_messages and not role.is_default()]
         if mod_roles:
@@ -267,6 +320,7 @@ class Manager(commands.Cog):
             await ctx.send("No moderator roles found.")
 
     @commands.hybrid_command(name="nick", help="Manager:Change bot nickname")
+    @commands.guild_only()
     @commands.has_permissions(manage_nicknames=True)
     @app_commands.describe(new_nick="The new nickname for the bot")
     async def nick(self, ctx: commands.Context, *, new_nick: str):
@@ -277,6 +331,7 @@ class Manager(commands.Cog):
             await ctx.send("❌ I don't have permission to change my nickname.")
 
     @commands.hybrid_command(name="rolecolor", help="Manager: Change a role's color")
+    @commands.guild_only()
     @commands.has_permissions(manage_roles=True)
     @app_commands.describe(role="The role to change the color of", color="The new color to apply")
     @app_commands.choices(color=color_choices)
@@ -295,9 +350,9 @@ class Manager(commands.Cog):
 
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to edit that role.")
-
-
+            
     @commands.hybrid_command(name="renamechannel", help="Manager: Rename a channel")
+    @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     @app_commands.describe(channel="The channel to rename", new_name="The new name for the channel")
     async def renamechannel(self, ctx:commands.Context, channel: discord.TextChannel, *, new_name: str):
@@ -307,8 +362,6 @@ class Manager(commands.Cog):
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to edit that channel.")
 
-
 async def setup(bot):
     await bot.add_cog(Manager(bot))
-
     print("📦 Loaded manager cog.")
