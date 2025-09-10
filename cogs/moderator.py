@@ -3,6 +3,68 @@ from discord.ext import commands
 from discord import app_commands
 from collections import defaultdict
 
+class AuditLogView(discord.ui.View):
+    def __init__(self, entries, ctx, per_page=10):
+        super().__init__(timeout=180)
+        self.entries = entries
+        self.ctx = ctx
+        self.per_page = per_page
+        self.current_page = 0
+        self.total_pages = max(1, (len(entries) - 1) // per_page + 1)
+        self.message = None
+        self.update_buttons()
+
+    def format_target(self, target):
+        if hasattr(target, "name"):
+            return target.name
+        if isinstance(target, discord.PartialIntegration):
+            return f"{target.name} (Integration)"
+        if isinstance(target, discord.Object):
+            return "Unknown Integration"
+        try:
+            return str(target)
+        except:
+            return "Unknown"
+
+    def get_page_embed(self):
+        start = self.current_page * self.per_page
+        end = start + self.per_page
+        page_entries = self.entries[start:end]
+
+        embed = discord.Embed(
+            title=f"Audit Log (Page {self.current_page + 1}/{self.total_pages})",
+            color=discord.Color.dark_red()
+        )
+        for entry in page_entries:
+            user = str(entry.user)
+            target = self.format_target(entry.target)
+            action = str(entry.action).replace("AuditLogAction.", "")
+            reason = entry.reason or "No reason"
+            embed.add_field(name=f"{user}  →  {target}", value=f"`Action  : {action}`\n`Reason  : {reason}`", inline=False)
+
+        return embed
+
+    def update_buttons(self):
+        for child in self.children:
+            if child.label == "Previous":
+                child.disabled = self.current_page == 0
+            elif child.label == "Next":
+                child.disabled = self.current_page >= self.total_pages - 1
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.danger)
+    async def prev_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.danger)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
+
 class Moderator(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -70,7 +132,7 @@ class Moderator(commands.Cog):
         await member.ban(reason=reason)
         await ctx.send(f"🔨 {member.mention} has been banned. Reason: {reason}")
 
-    @commands.hybrid_command(name="warn", help="Moderator:Warn a user. 3 warnings will result in a kick")
+    @commands.hybrid_command(name="warn", help="Moderator: Warn a user. 3 warnings will result in a kick")
     @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(member="The member to warn", reason="The reason for the warning")
@@ -78,35 +140,57 @@ class Moderator(commands.Cog):
         if member.bot:
             return await ctx.send("🤖 You can't warn a bot.")
 
-        warnings = self.bot.warnings
-        warnings[member.id] = min(warnings[member.id] + 1, 10)  # cap at 10
-        count = warnings[member.id]
+        guild_id = ctx.guild.id
+        user_id = member.id
+        automod = self.bot.get_cog("AutoMod")
+        if automod:
+            count = await automod.on_message_warn(user_id, guild_id)
+        else:
+            count = 1  
 
         await ctx.send(f"⚠️ {member.mention} has been warned. ({count}/10) Reason: {reason}")
+        if automod:
+            if count == 5:
+                try:
+                    await ctx.guild.kick(member, reason="Too many warnings (5)")
+                    await ctx.send(f"👢 {member.mention} has been kicked for reaching 5 warnings.")
+                except:
+                    pass
+            elif count >= 10:
+                try:
+                    await ctx.guild.ban(member, reason="Too many warnings (10)")
+                    await ctx.send(f"⛔ {member.mention} has been banned for reaching 10 warnings.")
+                except:
+                    pass
+                        
+    async def banned_users_autocomplete(self, interaction, current: str):
+        if not interaction.guild:
+            return []
+        bans = [ban async for ban in interaction.guild.bans()]
+        return [
+            discord.app_commands.Choice(
+                name=f"{ban.user.name}#{ban.user.discriminator}",
+                value=str(ban.user.id)
+            )
+            for ban in bans
+            if current.lower() in f"{ban.user.name}#{ban.user.discriminator}".lower()
+        ][:25] 
+        
+    async def clear_user_warnings(self, user_id: int, guild_id: int):
+        automod = self.bot.get_cog("AutoMod")  
+        if automod:
+            await automod.reset_warnings(user_id, guild_id)
 
-        if count == 3:
-            try:
-                await member.kick(reason="Reached 3 warnings")
-                await ctx.send(f"👢 {member.mention} has been kicked for reaching 3 warnings.")
-            except discord.Forbidden:
-                await ctx.send("❌ I don't have permission to kick this user.")
-
-        elif count == 10:
-            try:
-                await member.ban(reason="Reached 10 warnings")
-                await ctx.send(f"⛔ {member.mention} has been banned for reaching 10 warnings.")
-            except discord.Forbidden:
-                await ctx.send("❌ I don't have permission to ban this user.")
-
-
-    @commands.hybrid_command(name="unban", help="Moderator:Unban a user by ID or username#discriminator")
+    @commands.hybrid_command(name="unban",help="Moderator: Unban a user and reset their warnings")
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
-    @app_commands.describe(user="The ID or username#discriminator of the user to unban")
+    @app_commands.describe(user="Select the user to unban")
+    @app_commands.autocomplete(user=banned_users_autocomplete)
     async def unban(self, ctx: commands.Context, *, user: str):
-        banned_users = await ctx.guild.bans()
+        banned_users = [ban async for ban in ctx.guild.bans()]
         target = None
 
+        # Match by username#discriminator or by ID
         if user.isdigit():
             user_id = int(user)
             for ban_entry in banned_users:
@@ -126,7 +210,8 @@ class Moderator(commands.Cog):
 
         try:
             await ctx.guild.unban(target)
-            await ctx.send(f"✅ Successfully unbanned {target.mention}.")
+            await self.clear_user_warnings(target.id, ctx.guild.id)
+            await ctx.send(f"✅ Successfully unbanned {target.mention} and cleared their warnings.")
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to unban this user.")
         except Exception as e:
@@ -187,7 +272,18 @@ class Moderator(commands.Cog):
         deleted = await ctx.channel.purge(limit=limit)
         await ctx.send(f"🧹 Cleared {len(deleted)} messages.", delete_after=5)
 
+    @commands.hybrid_command(name="auditlog", description="View server audit logs")
+    @commands.guild_only()
+    async def auditlog(self, ctx: commands.Context):
+        entries = [entry async for entry in ctx.guild.audit_logs(limit=300)]
+        if not entries:
+            return await ctx.send("No audit log entries found.")
 
+        view = AuditLogView(entries, ctx)
+        embed = view.get_page_embed()
+        view.message = await ctx.send(embed=embed, view=view)
+
+    
 async def setup(bot):
     await bot.add_cog(Moderator(bot))
     print("📦 Loaded moderator cog.")
