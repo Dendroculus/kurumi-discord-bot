@@ -14,7 +14,7 @@ It focuses on moderation, automation, and useful utilities for server management
 
 ## Status
 - Kurumi has reached its **final version**. 
-- The bot is feature-complete with **36 commands**. 
+- The bot is feature-complete with **37 commands**. 
 - No new commands will be added, but minor improvements and maintenance may still occur.
 
 ---
