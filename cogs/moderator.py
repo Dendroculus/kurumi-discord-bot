@@ -7,13 +7,14 @@ class AuditLogView(discord.ui.View):
     def __init__(self, entries, ctx, per_page=10):
         super().__init__(timeout=180)
         self.entries = entries
+        self.author = ctx.author
         self.ctx = ctx
         self.per_page = per_page
         self.current_page = 0
         self.total_pages = max(1, (len(entries) - 1) // per_page + 1)
         self.message = None
         self.update_buttons()
-
+        
     def format_target(self, target):
         if hasattr(target, "name"):
             return target.name
@@ -64,6 +65,13 @@ class AuditLogView(discord.ui.View):
             self.current_page += 1
             self.update_buttons()
             await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
+            
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
+    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author.id:
+            return await interaction.response.send_message("❌ You can't delete this message.", ephemeral=True)
+        await interaction.response.defer()
+        await interaction.message.delete()
 
 class Moderator(commands.Cog):
     def __init__(self, bot):
