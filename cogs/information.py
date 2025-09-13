@@ -1,13 +1,13 @@
 import discord
 import time
 from discord.ext import commands
-from discord import app_commands
+from discord import app_commands, ui, ButtonStyle
 from discord.ui import View, Button
 import os
 
 # Track when bot starts
 start_time = time.time()
-
+        
 def generate_help_pages(bot_instance):
     categories = {"Information": [], "Manager": [], "Moderator": [], "Miscellaneous": []}
     
@@ -29,7 +29,7 @@ def generate_help_pages(bot_instance):
     for cat, cmds in categories.items():
         if not cmds:
             continue
-        embed = discord.Embed(title=f"📜 {cat} Commands", color=discord.Color.purple())
+        embed = discord.Embed(title=f"<:kurulove:1414905093878190180> {cat} Commands", color=discord.Color.purple())
         embed.set_thumbnail(url=str(bot_instance.user.display_avatar.url))
         embed.description = "\n".join(cmds)
         pages.append(embed)
@@ -51,13 +51,16 @@ class HelpView(View):
 
         self.prev_btn = Button(label="<", style=discord.ButtonStyle.danger)
         self.next_btn = Button(label=">", style=discord.ButtonStyle.danger)
+        self.delete_button = Button(label="Delete", style=discord.ButtonStyle.danger)
 
         self.prev_btn.callback = self.prev_button
         self.next_btn.callback = self.next_button
-
+        self.delete_button.callback = self.handle_delete
+        
         self.add_item(self.prev_btn)
         self.add_item(self.page_btn)
         self.add_item(self.next_btn)
+        self.add_item(self.delete_button)
 
         self._update_buttons()
 
@@ -85,6 +88,12 @@ class HelpView(View):
         self.current_page += 1
         self._update_buttons()
         await interaction.response.edit_message(embed=self.pages[self.current_page], view=self)
+        
+    async def handle_delete(self, interaction: discord.Interaction):
+        if interaction.user.id != self.author.id:
+            return await interaction.response.send_message("❌ You can't delete this message.", ephemeral=True)
+        await interaction.response.defer()
+        await interaction.message.delete()
         
 class Information(commands.Cog):
     def __init__(self, bot):
@@ -132,11 +141,7 @@ class Information(commands.Cog):
         latency = round(self.bot.latency * 1000)
         await ctx.send(f"🏓 Pong! `{latency}ms`")
 
-    @commands.hybrid_command(
-        name="commands", 
-        help="Information:Shows this command list", 
-        description="Shows a list of available commands."
-    )
+    @commands.hybrid_command( name="help",  help="Information:Shows this command list",  description="Shows a list of available commands.")
     @app_commands.describe(category="Choose a category to view")
     @app_commands.choices(category=[
         app_commands.Choice(name="Information", value="information"),
@@ -160,7 +165,7 @@ class Information(commands.Cog):
                 page.set_footer(text=f"Showing category: {category.name}")
                 await ctx.send(embed=page)
             else:
-                await ctx.send(f"❌ Could not find the category: {category.name}", ephemeral=True)
+                await ctx.send(f"❌ Could not find the category: {category.name}")
         else:
             view = HelpView(pages, ctx.author)
             message = await ctx.send(embed=pages[0], view=view)
