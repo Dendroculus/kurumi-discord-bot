@@ -42,8 +42,19 @@ class Misc(commands.Cog):
                 else:
                     await ctx.send("❌ Couldn't fetch a dog right now.", ephemeral=True)
                     
-    @commands.hybrid_command(name="anime", help="Search for an anime by name (AniList)")
-    @commands.guild_only()
+    @commands.hybrid_command(name="rabbits", help="Miscellaneous: Get a random rabbit image")
+    async def rabbits(self, ctx: commands.Context):
+        async with aiohttp.ClientSession() as session:
+            async with session.get("https://rabbit-api-two.vercel.app/api/random") as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    embed = discord.Embed(title="🐰 Cluck!", color=discord.Color.purple())
+                    embed.set_image(url=data["url"])
+                    await ctx.send(embed=embed)
+                else:
+                    await ctx.send("❌ Couldn't fetch a rabbit right now.", ephemeral=True)
+                    
+    @commands.hybrid_command(name="anime", help="Miscellaneous: Search for an anime by name (AniList)")
     async def anime(self, ctx: commands.Context, *, query: str):
         """Fetch anime info from AniList GraphQL API"""
 
@@ -284,7 +295,7 @@ class Misc(commands.Cog):
                 embed.add_field(name="📺 Anime Appearances", value=anime_tags, inline=False)
 
                 embed.set_footer(
-                    text="Provided by Jikan API • MyAnimeList",
+                    text="Provided by Jikan API",
                     icon_url="https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png"
                 )
 
