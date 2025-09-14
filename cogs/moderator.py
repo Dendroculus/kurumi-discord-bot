@@ -54,6 +54,10 @@ class AuditLogView(discord.ui.View):
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.danger)
     async def prev_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message("❌ You can't use these buttons.", ephemeral=True)
+            return
+        
         if self.current_page > 0:
             self.current_page -= 1
             self.update_buttons()
@@ -61,17 +65,13 @@ class AuditLogView(discord.ui.View):
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.danger)
     async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message("❌ You can't use these buttons.", ephemeral=True)
+            return
         if self.current_page < self.total_pages - 1:
             self.current_page += 1
             self.update_buttons()
             await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
-            
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
-    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.author.id:
-            return await interaction.response.send_message("❌ You can't delete this message.", ephemeral=True)
-        await interaction.response.defer()
-        await interaction.message.delete()
 
 class Moderator(commands.Cog):
     def __init__(self, bot):
@@ -273,8 +273,8 @@ class Moderator(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(limit="Number of messages to clear")
     async def clearchat(self, ctx: commands.Context, limit: int = 100):
-        if limit > 100 : 
-            limit = 100
+        if limit > 500 : 
+            limit = 500
         
         await ctx.defer(ephemeral=True)
         deleted = await ctx.channel.purge(limit=limit)
@@ -282,14 +282,18 @@ class Moderator(commands.Cog):
 
     @commands.hybrid_command(name="auditlog", description="View server audit logs")
     @commands.guild_only()
+    @commands.has_permissions(view_audit_log=True)
     async def auditlog(self, ctx: commands.Context):
         entries = [entry async for entry in ctx.guild.audit_logs(limit=300)]
         if not entries:
             return await ctx.send("No audit log entries found.")
 
         view = AuditLogView(entries, ctx)
-        embed = view.get_page_embed()
-        view.message = await ctx.send(embed=embed, view=view)
+        await ctx.interaction.response.send_message(
+            embed=view.get_page_embed(),
+            view=view,
+            ephemeral=True
+        )
 
     
 async def setup(bot):
