@@ -284,6 +284,8 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(view_audit_log=True)
     async def auditlog(self, ctx: commands.Context):
+        if ctx.interaction is None:
+            return await ctx.send("❌ Please use `/auditlog` (slash command) for better security.")
         entries = [entry async for entry in ctx.guild.audit_logs(limit=300)]
         if not entries:
             return await ctx.send("No audit log entries found.")
