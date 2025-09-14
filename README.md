@@ -1,6 +1,6 @@
 # Kurumi Discord Bot
 
-<img src="assets/kurumichibi.png" width="200" />
+<img src="assets/emojis/kurumichibi.png" width="200" />
 
 Kurumi is a multi-purpose Discord bot built with Python.  
 It focuses on moderation, automation, and useful utilities for server management.  
