@@ -26,12 +26,15 @@ See the [LICENSE](LICENSE) file for details.
 ---
 
 ## Disclaimer
-Kurumi is an independent project and is **not affiliated with, supported by, or endorsed by Discord Inc.**  
-All trademarks and copyrights related to Discord are owned by their respective owners.  
 
-All anime characters and artwork shown are the property of their respective creators.  
-Used here for non-commercial, portfolio purposes only. <br><br>
-⚠️ GIF files are not included. Please place kurumi.gif (and others if needed) in the assets/ folder before using commands that has GIF outputs.
+- Kurumi is an independent project and is **not affiliated with, supported by, or endorsed by Discord Inc.**  
+  All trademarks and copyrights related to Discord are owned by their respective owners.  
+- All anime characters and artwork shown are the property of their respective creators.  
+- All emoji assets are made by me.  
+- Used here for **non-commercial, portfolio purposes only**.  
+- ⚠️ GIF files are not included. Place kurumi.gif (and others if needed) in the `assets/` folder before using commands that rely on GIF outputs.  
+- Upload the emoji file into Discord Developer Portal and update the IDs in the code to display them correctly.
+
 
 ## Artwork Attribution
 
