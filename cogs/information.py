@@ -28,7 +28,7 @@ def generate_help_pages(bot_instance):
     for cat, cmds in categories.items():
         if not cmds:
             continue
-        embed = discord.Embed(title=f"<:kurulove:1414905093878190180> {cat} Commands", color=discord.Color.purple())
+        embed = discord.Embed(title=f"<:KurumiLove:1414905093878190180> {cat} Commands", color=discord.Color.purple())
         embed.set_thumbnail(url=str(bot_instance.user.display_avatar.url))
         embed.description = "\n".join(cmds)
         pages.append(embed)
@@ -102,21 +102,24 @@ class Information(commands.Cog):
     @commands.guild_only()
     async def membercount(self, ctx: commands.Context):
         await ctx.send(f"👥 This server has **{ctx.guild.member_count}** members.")
-        
+            
     @commands.hybrid_command(name="serverstats", help="Information:Shows server statistics")
     @commands.guild_only()
     async def serverstats(self, ctx: commands.Context):
         guild = ctx.guild
-        embed = discord.Embed(title=f"📊 Server Stats — {guild.name}", color=discord.Color.purple())
+        embed = discord.Embed(title=f"Server Stats — {guild.name}", color=discord.Color.purple())
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
-        embed.add_field(name="👑 Owner", value=guild.owner, inline=True)
-        embed.add_field(name="👥 Members", value=guild.member_count, inline=True)
-        embed.add_field(name="📜 Roles", value=len(guild.roles), inline=True)
-        embed.add_field(name="💬 Text Channels", value=len(guild.text_channels), inline=True)
-        embed.add_field(name="🔊 Voice Channels", value=len(guild.voice_channels), inline=True)
-        embed.add_field(name="📅 Created On", value=discord.utils.format_dt(guild.created_at, style='F'), inline=False)
+
+        embed.add_field(name="<:Crown:1416769782769782824> Owner", value=guild.owner, inline=True)
+        embed.add_field(name="<:Members:1416774798562033745> Members", value=guild.member_count, inline=True)
+        embed.add_field(name="<:Roles:1416773159381766266> Roles", value=len(guild.roles), inline=True)
+        embed.add_field(name="<:TextChannels:1416773166289780746> Text Channels", value=len(guild.text_channels), inline=True)
+        embed.add_field(name="<:VoiceChannels:1416773174116225145> Voice Channels", value=len(guild.voice_channels), inline=True)
+        embed.add_field(name="<:Calendar:1416773567382552596> Created On", value=discord.utils.format_dt(guild.created_at, style='F'), inline=False)
+
         await ctx.send(embed=embed)
+
         
     @commands.hybrid_command(name="member", help="Information:List members in a role (max 90)")
     @commands.guild_only()
@@ -171,7 +174,7 @@ class Information(commands.Cog):
             view.message = message
 
     @commands.hybrid_command(name="info", help="Information:Shows bot information")
-    async def info(self, ctx: commands.Context):
+    async def info(self, ctx):
         uptime_seconds = int(time.time() - start_time)
         hours, remainder = divmod(uptime_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -184,16 +187,17 @@ class Information(commands.Cog):
         )
         embed.set_thumbnail(url="attachment://kurumi.gif")  
 
-        embed.add_field(name="🆔 Bot Name", value=self.bot.user.name, inline=True)
-        embed.add_field(name="📌 ID", value=self.bot.user.id, inline=True)
-        embed.add_field(name="👤 Creator", value="Soumetsu.#8818", inline=True)
-        embed.add_field(name="🔧 Prefix", value="`!`", inline=True)
-        embed.add_field(name="🌐 Servers", value=f"{len(self.bot.guilds)}", inline=True)
-        embed.add_field(name="⏱️ Uptime", value=uptime_str, inline=True)
+        embed.add_field(name=f"<:Bot:1416777544870396016> Bot Name", value=self.bot.user.name, inline=True)
+        embed.add_field(name=f"<:ID:1416777985167724687> ID", value=self.bot.user.id, inline=True)
+        embed.add_field(name=f"<:Creator:1416783996440023050> Creator", value="Soumetsu.#8818", inline=True)
+        embed.add_field(name=f"<:Wrench:1416781024381112513> Prefix", value="`!`", inline=True)
+        embed.add_field(name=f"<:Globe:1416781731616526356> Servers", value=f"{len(self.bot.guilds)}", inline=True)
+        embed.add_field(name=f"<:Clock:1416782289672732772> Uptime", value=uptime_str, inline=True)
 
-        file = discord.File(os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi.gif"), filename="kurumi.gif")
+        file = discord.File(os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi.gif"),filename="kurumi.gif")
 
         await ctx.send(file=file, embed=embed)
+
 
         
 async def setup(bot):
