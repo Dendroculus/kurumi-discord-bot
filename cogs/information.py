@@ -1,11 +1,10 @@
 import discord
 import time
 from discord.ext import commands
-from discord import app_commands, ui, ButtonStyle
+from discord import app_commands
 from discord.ui import View, Button
 import os
 
-# Track when bot starts
 start_time = time.time()
         
 def generate_help_pages(bot_instance):
@@ -157,7 +156,7 @@ class Information(commands.Cog):
         if category:
             target_page_index = -1
             for i, page in enumerate(pages):
-                if page.title.lower().startswith(f"📜 {category.name.lower()}"):
+                if category.value in page.title.lower():
                     target_page_index = i
                     break
             if target_page_index != -1:
