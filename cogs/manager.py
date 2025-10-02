@@ -3,7 +3,39 @@ from discord.ext import commands
 from discord import app_commands, ui, Interaction
 from datetime import timedelta
 import re
+from typing import Optional
 
+
+color_choices = [
+    app_commands.Choice(name="Red", value="#FF0000"),
+    app_commands.Choice(name="Green", value="#00FF00"),
+    app_commands.Choice(name="Blue", value="#0000FF"),
+    app_commands.Choice(name="Yellow", value="#FFFF00"),
+    app_commands.Choice(name="Purple", value="#800080"),
+    app_commands.Choice(name="Orange", value="#FFA500"),
+    app_commands.Choice(name="Pink", value="#FFC0CB"),
+    app_commands.Choice(name="Cyan", value="#00FFFF"),
+    app_commands.Choice(name="White", value="#FFFFFF"),
+    app_commands.Choice(name="Black", value="#000000"),
+    app_commands.Choice(name="Teal", value="#008080"),
+    app_commands.Choice(name="Lime", value="#32CD32"),
+    app_commands.Choice(name="Magenta", value="#FF00FF"),
+    app_commands.Choice(name="Indigo", value="#4B0082"),
+    app_commands.Choice(name="Turquoise", value="#40E0D0"),
+    app_commands.Choice(name="Gold", value="#FFD700"),
+    app_commands.Choice(name="Silver", value="#C0C0C0"),
+    app_commands.Choice(name="Brown", value="#8B4513"),
+    app_commands.Choice(name="Lavender", value="#E6E6FA"),
+    app_commands.Choice(name="Navy", value="#000080"),
+]
+
+async def role_autocomplete(interaction: discord.Interaction, current: str):
+    return [
+        app_commands.Choice(name=role.name, value=role.name)
+        for role in interaction.guild.roles
+        if current.lower() in role.name.lower()
+    ][:25]
+    
 class EmojiCreatorView(ui.View):
     def __init__(self, author: discord.Member):
         super().__init__(timeout=120)  
@@ -240,29 +272,45 @@ class Manager(commands.Cog):
             for role in roles[:25]
         ]
 
-    @commands.hybrid_command(name="addrole", help="Manager:Add a new role or assign it to a user")
+    @commands.hybrid_command(name="addrole",help="Manager: Add a new role (with color) or assign it to a user")
     @commands.guild_only()
     @commands.has_permissions(manage_roles=True)
-    @app_commands.describe(role_name="The name of the role to create or assign", member="The member to assign the role to (optional)")
+    @app_commands.describe(
+        role_name="The name of the role to create or assign",
+        member="The member to assign the role to (mention or ID, optional)",
+        color="The color for the role (only used when creating a new role)"
+    )
     @app_commands.autocomplete(role_name=role_autocomplete)
-    async def addrole(self, ctx: commands.Context, role_name: str, member: discord.Member = None):
-        role = discord.utils.get(ctx.guild.roles, name=role_name)
-        
+    @app_commands.choices(color=color_choices)
+    async def addrole(
+        self,
+        ctx: commands.Context,
+        role_name: str,
+        member: Optional[discord.Member] = None,
+        color: Optional[app_commands.Choice[str]] = None,
+    ):
+        guild = ctx.guild
+        if guild is None:
+            return await ctx.send("❌ This command must be used in a server.")
+
+        role = discord.utils.get(guild.roles, name=role_name)
+
         if not role:
             try:
-                role = await ctx.guild.create_role(name=role_name)
-                await ctx.send(f"🎉 Role `{role_name}` created.")
+                colour = discord.Color(int(color.value.lstrip("#"), 16)) if color else discord.Color.default()
+                role = await guild.create_role(name=role_name, colour=colour)
+                await ctx.send(f"🎉 Role `{role_name}` created{' with ' + color.name if color else ''}.")
             except discord.Forbidden:
                 return await ctx.send("❌ I don't have permission to create roles.")
+        else:
+            await ctx.send(f"ℹ️ Role `{role_name}` already exists.")
 
         if member:
             try:
                 await member.add_roles(role)
-                await ctx.send(f"✅ Role `{role.name}` assigned to {member.mention}.")
+                await ctx.send(f"✅ Role `{role.name}` assigned to {member.mention}.", ephemeral=True)
             except discord.Forbidden:
-                await ctx.send(f"❌ I don't have permission to assign roles to that member.")
-        else:
-            await ctx.send(f"✅ Role `{role_name}` is ready. Mention a member to assign it.")
+                await ctx.send(f"❌ I don't have permission to assign roles to {member.mention}.", ephemeral=True)
 
 
     @commands.hybrid_command(name="delrole", help="Manager:Remove a role from members or delete it")
