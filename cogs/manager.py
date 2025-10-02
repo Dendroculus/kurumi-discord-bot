@@ -28,13 +28,6 @@ color_choices = [
     app_commands.Choice(name="Lavender", value="#E6E6FA"),
     app_commands.Choice(name="Navy", value="#000080"),
 ]
-
-async def role_autocomplete(interaction: discord.Interaction, current: str):
-    return [
-        app_commands.Choice(name=role.name, value=role.name)
-        for role in interaction.guild.roles
-        if current.lower() in role.name.lower()
-    ][:25]
     
 class EmojiCreatorView(ui.View):
     def __init__(self, author: discord.Member):
@@ -272,27 +265,16 @@ class Manager(commands.Cog):
             for role in roles[:25]
         ]
 
-    @commands.hybrid_command(name="addrole",help="Manager: Add a new role (with color) or assign it to a user")
+    @commands.hybrid_command(name="createrole", help="Manager: Create a new role (with optional color)")
     @commands.guild_only()
     @commands.has_permissions(manage_roles=True)
     @app_commands.describe(
-        role_name="The name of the role to create or assign",
-        member="The member to assign the role to (mention or ID, optional)",
-        color="The color for the role (only used when creating a new role)"
+        role_name="The name of the role to create",
+        color="Optional preset color for the role"
     )
-    @app_commands.autocomplete(role_name=role_autocomplete)
     @app_commands.choices(color=color_choices)
-    async def addrole(
-        self,
-        ctx: commands.Context,
-        role_name: str,
-        member: Optional[discord.Member] = None,
-        color: Optional[app_commands.Choice[str]] = None,
-    ):
+    async def createrole(self, ctx: commands.Context, role_name: str, color: Optional[app_commands.Choice[str]] = None):
         guild = ctx.guild
-        if guild is None:
-            return await ctx.send("❌ This command must be used in a server.")
-
         role = discord.utils.get(guild.roles, name=role_name)
 
         if not role:
@@ -301,16 +283,39 @@ class Manager(commands.Cog):
                 role = await guild.create_role(name=role_name, colour=colour)
                 await ctx.send(f"🎉 Role `{role_name}` created{' with ' + color.name if color else ''}.")
             except discord.Forbidden:
-                return await ctx.send("❌ I don't have permission to create roles.")
+                return await ctx.send("❌ I don't have permission to create roles.", ephemeral=True)
+            except Exception as e:
+                return await ctx.send(f"❌ Failed to create role: `{e}`", ephemeral=True)
         else:
             await ctx.send(f"ℹ️ Role `{role_name}` already exists.")
+    
+    @commands.hybrid_command(name="assignrole", help="Manager: Assign an existing role to a user")
+    @commands.guild_only()
+    @commands.has_permissions(manage_roles=True)
+    @app_commands.describe(
+        role_name="The name of the existing role to assign",
+        member="The member to assign the role to (mention or ID)"
+    )
+    @app_commands.autocomplete(role_name=role_autocomplete)
+    async def assignrole(self, ctx: commands.Context, role_name: str, member: Optional[discord.Member] = None):
+        guild = ctx.guild
+        if guild is None:
+            return await ctx.send("❌ This command must be used in a server.")
 
-        if member:
-            try:
-                await member.add_roles(role)
-                await ctx.send(f"✅ Role `{role.name}` assigned to {member.mention}.", ephemeral=True)
-            except discord.Forbidden:
-                await ctx.send(f"❌ I don't have permission to assign roles to {member.mention}.", ephemeral=True)
+        role = discord.utils.get(guild.roles, name=role_name)
+        if not role:
+            return await ctx.send(f"❌ Role `{role_name}` not found.", ephemeral=True)
+
+        if not member:
+            return await ctx.send("❌ Please specify a member to assign the role to.", ephemeral=True)
+
+        try:
+            await member.add_roles(role)
+            await ctx.send(f"✅ Role `{role.name}` assigned to {member.mention}.", ephemeral=True)
+        except discord.Forbidden:
+            await ctx.send(f"❌ I don't have permission to assign roles to {member.mention}.", ephemeral=True)
+        except Exception as e:
+            await ctx.send(f"❌ Failed to assign role: `{e}`", ephemeral=True)
 
 
     @commands.hybrid_command(name="delrole", help="Manager:Remove a role from members or delete it")
@@ -339,24 +344,24 @@ class Manager(commands.Cog):
                 for m in role.members:
                     await m.remove_roles(role)
                     removed_count += 1
-                await ctx.send(f"✅ Removed `{role.name}` from all {removed_count} members.")
+                await ctx.send(f"✅ Removed `{role.name}` from all {removed_count} members.", ephemeral=True)
             
             elif action.value == "choose":
                 if not member:
-                    return await ctx.send("❌ You must select a member to remove this role from.")
+                    return await ctx.send("❌ You must select a member to remove this role from.", ephemeral=True)
                 if role not in member.roles:
-                    return await ctx.send(f"❌ {member.mention} does not have the `{role.name}` role.")
+                    return await ctx.send(f"❌ {member.mention} does not have the `{role.name}` role.", ephemeral=True)
                 await member.remove_roles(role)
-                await ctx.send(f"✅ Removed `{role.name}` from {member.mention}.")
+                await ctx.send(f"✅ Removed `{role.name}` from {member.mention}.", ephemeral=True)
             
             elif action.value == "delete":
                 await role.delete()
-                await ctx.send(f"🗑️ Role `{role.name}` has been deleted.")
+                await ctx.send(f"🗑️ Role `{role.name}` has been deleted.", ephemeral=True)
 
         except discord.Forbidden:
-            await ctx.send("❌ I do not have permission to modify this role.")
+            await ctx.send("❌ I do not have permission to modify this role.", ephemeral=True)
         except Exception as e:
-            await ctx.send(f"An error occurred: {e}")
+            await ctx.send(f"An error occurred: {e}", ephemeral=True)
 
     @commands.hybrid_command(name="listmods", help="Manager:List all moderators")
     @commands.guild_only()
