@@ -1,7 +1,13 @@
 import discord
 from discord.ext import commands
-from discord import app_commands
+from discord import app_commands, PermissionOverwrite, Role, Member
 from collections import defaultdict
+from typing import Optional
+import re
+
+SPLIT_RE = re.compile(r'[,\n;|]+')
+MENTION_RE = re.compile(r'<@!?(?P<id>\d+)>')
+ID_RE = re.compile(r'^\d{17,20}$')
 
 class AuditLogView(discord.ui.View):
     def __init__(self, entries, ctx, per_page=10):
@@ -226,15 +232,30 @@ class Moderator(commands.Cog):
             await ctx.send(f"❌ Failed to unban: `{e}`")
 
 
-    @commands.hybrid_command(name="lock", help="Moderator:Lock the current channel")
+    @commands.hybrid_command(name="lock", help="Moderator: Lock the current channel for everyone except top role and admins")
     @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     async def lock(self, ctx: commands.Context):
-        overwrite = ctx.channel.overwrites_for(ctx.guild.default_role)
-        overwrite.send_messages = False
-        overwrite.view_channel = False
-        await ctx.channel.set_permissions(ctx.guild.default_role, overwrite=overwrite)
-        await ctx.send("🔒 Channel is now locked and hidden from @everyone.")
+        channel = ctx.channel
+        guild = ctx.guild
+
+        if not isinstance(channel, discord.TextChannel):
+            return await ctx.send("❌ This command must be used in a text channel.")
+
+        top_role = guild.roles[-1]
+
+        overwrites = {
+            guild.default_role: PermissionOverwrite(view_channel=False, send_messages=False),
+            top_role: PermissionOverwrite(view_channel=True, send_messages=True),
+        }
+
+        for member in guild.members:
+            if member.guild_permissions.administrator or member == guild.owner:
+                overwrites[member] = PermissionOverwrite(view_channel=True, send_messages=True)
+
+        await channel.edit(overwrites=overwrites, reason=f"Locked by {ctx.author}")
+
+        await ctx.send("🔒 Channel locked: only top role and admins (including admin bots) can view/send.")
 
     @commands.hybrid_command(name="unlock", help="Moderator:Unlock the current channel")
     @commands.guild_only()
@@ -297,7 +318,29 @@ class Moderator(commands.Cog):
             ephemeral=True
         )
 
-    
+    @commands.hybrid_command(name="addlockedmember")
+    @commands.guild_only()
+    @commands.has_permissions(manage_channels=True)
+    async def addlockedmember(
+        self,
+        ctx: commands.Context,
+        role: Optional[discord.Role] = None,
+        send_messages: bool = True
+    ):
+        channel = ctx.channel
+
+        if role is None:
+            return await ctx.send("❌ Please provide a role (e.g. /addlockedmember role:@Moderators).")
+
+        try:
+            await channel.set_permissions(role, view_channel=True, send_messages=send_messages)
+        except discord.Forbidden:
+            return await ctx.send("❌ I don't have permission to edit channel permissions.")
+        except Exception as e:
+            return await ctx.send(f"❌ Failed to set permissions: `{e}`")
+
+        await ctx.send(f"✅ Role {role.mention} was given access to this channel.")
+        
 async def setup(bot):
     await bot.add_cog(Moderator(bot))
     print("📦 Loaded moderator cog.")
