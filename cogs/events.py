@@ -10,19 +10,16 @@ class Events(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-        # cooldowns (seconds) — tweak as needed
-        self.mention_cooldown = 30        # per-user cooldown for mentions
-        self.dm_cooldown = 3600          # per-user cooldown for DMs
-        self.global_cooldown = 2         # tiny cooldown preventing immediate repeated auto-responses per user
-        self.channel_cooldown = 10       # per-channel cooldown preventing channel spam from many users
+        self.mention_cooldown = 30       
+        self.dm_cooldown = 3600          
+        self.global_cooldown = 2         
+        self.channel_cooldown = 10      
 
-        # state
         self.mention_cooldowns: dict[int, float] = {}
         self.dm_cooldowns: dict[int, float] = {}
         self.global_cooldowns: dict[int, float] = {}
         self.channel_cooldowns: dict[int, float] = {}
 
-        # preload assets (bytes)
         self.gifs: dict[str, bytes] = {}
         self._preload_assets()
 
@@ -129,8 +126,7 @@ class Events(commands.Cog):
             return
 
         if message.guild is None:
-            if await self._handle_dm(message):
-                return
+            await self._handle_dm(message)
             return
 
         if profanity.contains_profanity(message.content):
@@ -201,4 +197,4 @@ class Events(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Events(bot))
-    print("📦 Loaded events cog (robust).")
+    print("📦 Loaded events cog.")
