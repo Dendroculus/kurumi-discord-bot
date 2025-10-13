@@ -13,9 +13,12 @@ os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 class AutoMod(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.user_messages = defaultdict(lambda: deque(maxlen=5))  # last 5 messages
+        self.user_messages = defaultdict(lambda: deque(maxlen=5)) 
         self.muted_users = set()
-        self.recently_warned = set()  # prevent duplicate spam triggers
+        self.recently_warned = set()  
+
+        self._bg_tasks = set()
+
         self.conn = sqlite3.connect(DB_PATH)
         self.c = self.conn.cursor()
         self.c.execute("""
@@ -27,6 +30,12 @@ class AutoMod(commands.Cog):
         )
         """)
         self.conn.commit()
+
+    def _track_task(self, coro):
+        task = asyncio.create_task(coro)
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
+        return task
 
     async def on_message_warn(self, user_id: int, guild_id: int):
         self.c.execute("""
@@ -65,7 +74,7 @@ class AutoMod(commands.Cog):
             try:
                 await self.warn_user(message)
             finally:
-                asyncio.create_task(self.clear_recent_warn(guild_id, user_id))
+                self._track_task(self.clear_recent_warn(guild_id, user_id))
 
     async def clear_recent_warn(self, guild_id, user_id):
         await asyncio.sleep(5)
@@ -100,7 +109,7 @@ class AutoMod(commands.Cog):
                 self.muted_users.add(user_id)
                 await user.timeout(duration=60, reason="Spamming (Auto-mute)")
                 await message.channel.send(f"🔇 {user.mention} has been temporarily muted (60s).")
-                asyncio.create_task(self.clear_muted(user_id, 60))
+                self._track_task(self.clear_muted(user_id, 60))
 
             if count == 5:
                 await guild.kick(user, reason="Too many warnings (5)")
