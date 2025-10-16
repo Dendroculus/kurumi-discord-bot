@@ -1,19 +1,21 @@
 import discord
 from discord.ext import commands
 from better_profanity import profanity
-import os
 import io
 import time
 from typing import Optional
+import logging
+from utils import config
+
 
 class Events(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-        self.mention_cooldown = 30       
-        self.dm_cooldown = 3600          
-        self.global_cooldown = 2         
-        self.channel_cooldown = 10      
+        self.mention_cooldown = 30
+        self.dm_cooldown = 3600
+        self.global_cooldown = 2
+        self.channel_cooldown = 10
 
         self.mention_cooldowns: dict[int, float] = {}
         self.dm_cooldowns: dict[int, float] = {}
@@ -21,24 +23,25 @@ class Events(commands.Cog):
         self.channel_cooldowns: dict[int, float] = {}
 
         self.gifs: dict[str, bytes] = {}
+        self.logger = logging.getLogger("bot")
         self._preload_assets()
 
     def _preload_assets(self) -> None:
-        base_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
+        base_path = config.ASSETS_DIR
         files = {
             "welcome": "kurumi1.gif",
             "mention": "kurumi2.gif",
             "dm": "kurumi3.gif",
         }
         for key, fname in files.items():
-            path = os.path.join(base_path, fname)
+            path = base_path / fname
             try:
                 with open(path, "rb") as f:
                     self.gifs[key] = f.read()
             except FileNotFoundError:
-                print(f"❌ Asset missing: {path} (key={key})")
+                self.logger.warning("Asset missing: %s (key=%s)", path, key)
             except Exception as e:
-                print(f"❌ Error loading asset {path}: {e}")
+                self.logger.exception("Error loading asset %s: %s", path, e)
 
     def _file_from_bytes(self, name: str, bytes_data: bytes) -> discord.File:
         return discord.File(io.BytesIO(bytes_data), filename=name)
@@ -86,16 +89,16 @@ class Events(commands.Cog):
             await self.bot.change_presence(activity=discord.CustomActivity(name="ara ara konnichiwa"))
         except Exception:
             pass
-        print(f"✅ Logged in as {self.bot.user}")
+        self.logger.info("Logged in as %s", self.bot.user)
         try:
             synced = await self.bot.tree.sync()
-            print(f"🔄 Synced {len(synced)} slash commands.")
+            self.logger.info("Synced %d slash commands.", len(synced))
         except Exception as e:
-            print(f"❌ Failed to sync slash commands: {e}")
+            self.logger.exception("Failed to sync slash commands: %s", e)
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
-        channel = discord.utils.get(member.guild.text_channels, name="💬-general")
+        channel = discord.utils.get(member.guild.text_channels, name=config.WELCOME_CHANNEL_NAME)
         if not channel:
             return
 
@@ -109,7 +112,7 @@ class Events(commands.Cog):
             except discord.Forbidden:
                 pass
             except Exception as e:
-                print(f"❌ Failed welcome send: {e}")
+                self.logger.exception("Failed welcome send: %s", e)
         else:
             try:
                 await channel.send(f"Welcome to the server, {member.mention}!")
@@ -139,7 +142,7 @@ class Events(commands.Cog):
             except discord.Forbidden:
                 pass
             except Exception as e:
-                print(f"❌ Failed to delete profanity message: {e}")
+                self.logger.exception("Failed to delete profanity message: %s", e)
             return
 
         if self.bot.user.mentioned_in(message) and not message.reference:
@@ -166,7 +169,7 @@ class Events(commands.Cog):
             except discord.Forbidden:
                 return True
             except discord.HTTPException as e:
-                print(f"❌ DM send HTTP error: {e}")
+                self.logger.exception("DM send HTTP error: %s", e)
                 return True
             return True
         else:
@@ -188,13 +191,14 @@ class Events(commands.Cog):
             except discord.Forbidden:
                 pass
             except discord.HTTPException as e:
-                print(f"❌ Mention send HTTP error: {e}")
+                self.logger.exception("Mention send HTTP error: %s", e)
         else:
             try:
                 await message.channel.send(embed=embed)
             except Exception:
                 pass
 
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(Events(bot))
-    print("📦 Loaded events cog.")
+    logging.getLogger("bot").info("Loaded events cog.")
