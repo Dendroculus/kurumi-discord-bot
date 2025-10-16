@@ -45,6 +45,13 @@ class Misc(commands.Cog):
             await interaction.response.defer()
 
     @staticmethod
+    async def _reply_ephemeral(interaction: discord.Interaction, content: str) -> None:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(content, ephemeral=True)
+        else:
+            await interaction.followup.send(content, ephemeral=True)
+
+    @staticmethod
     def _sanitize(description: str, limit: int = 4096) -> str:
         desc = (description or "No description available.").replace("<br>", "\n").replace("<i>", "").replace("</i>", "")
         if len(desc) > limit:
@@ -187,11 +194,15 @@ class Misc(commands.Cog):
                 super().__init__()
                 self.by_id = {str(e["id"]): e for e in entries}
                 select = Select(placeholder="Choose an anime...", options=items)
+
                 async def _on_select(interaction: discord.Interaction):
                     anime_id = interaction.data["values"][0]
                     anime_data = self.by_id.get(anime_id)
+                    if not anime_data:
+                        return await Misc._reply_ephemeral(interaction, "❌ Selected item not found anymore. Please run the command again.")
                     embed = Misc._build_anime_embed(anime_data)
                     await interaction.response.edit_message(embed=embed, view=None)
+
                 select.callback = _on_select
                 self.add_item(select)
 
@@ -217,27 +228,33 @@ class Misc(commands.Cog):
         for char in results:
             name = char.get("name") or "Unknown"
             kanji = char.get("name_kanji") or "N/A"
-            options.append(discord.SelectOption(
-                label=name[:100],
-                description=f"Kanji: {kanji}"[:100],
-                value=str(char["mal_id"])
-            ))
+            options.append(
+                discord.SelectOption(
+                    label=name[:100],
+                    description=f"Kanji: {kanji}"[:100],
+                    value=str(char["mal_id"]),
+                )
+            )
 
         class CharacterSelectView(View):
             def __init__(self, items: List[discord.SelectOption]):
                 super().__init__()
                 select = Select(placeholder="Choose a character...", options=items)
+
                 async def _on_select(interaction: discord.Interaction):
                     mal_id = interaction.data["values"][0]
                     detail_url = f"https://api.jikan.moe/v4/characters/{mal_id}/full"
                     async with aiohttp.ClientSession() as s2:
                         async with s2.get(detail_url) as resp2:
                             if resp2.status != 200:
-                                return await interaction.response.send_message("❌ Could not fetch details.", ephemeral=True)
+                                return await Misc._reply_ephemeral(interaction, "❌ Could not fetch details.")
                             char_data = (await resp2.json()).get("data", {}) or {}
+                    if not char_data:
+                        return await Misc._reply_ephemeral(interaction, "❌ Character details not found.")
 
                     embed = self._build_character_embed(char_data)
                     await interaction.response.edit_message(embed=embed, view=None)
+
                 select.callback = _on_select
                 self.add_item(select)
 
@@ -296,10 +313,14 @@ class Misc(commands.Cog):
                     embed.set_thumbnail(url=image_url)
 
                 info_left = []
-                if "Age" in fields: info_left.append(f"**Age:** {fields['Age']}")
-                if "Height" in fields: info_left.append(f"**Height:** {fields['Height']}")
-                if "Birthday" in fields: info_left.append(f"**Birthday:** {fields['Birthday']}")
-                if "Hair color" in fields: info_left.append(f"**Hair Color:** {fields['Hair color']}")
+                if "Age" in fields:
+                    info_left.append(f"**Age:** {fields['Age']}")
+                if "Height" in fields:
+                    info_left.append(f"**Height:** {fields['Height']}")
+                if "Birthday" in fields:
+                    info_left.append(f"**Birthday:** {fields['Birthday']}")
+                if "Hair color" in fields:
+                    info_left.append(f"**Hair Color:** {fields['Hair color']}")
 
                 info_right = f"**Kanji:** {kanji}\n**Seiyuu:** {seiyuu}\n"
 
@@ -310,7 +331,7 @@ class Misc(commands.Cog):
                 embed.add_field(name="📺 Anime Appearances", value=anime_tags, inline=False)
                 embed.set_footer(
                     text="Provided by Jikan API",
-                    icon_url="https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png"
+                    icon_url="https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png",
                 )
                 return embed
 
