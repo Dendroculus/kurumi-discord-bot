@@ -4,6 +4,7 @@ from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button
 import os
+from utils import config
 
 start_time = time.time()
         
@@ -20,7 +21,7 @@ def generate_help_pages(bot_instance):
             category = category.strip().capitalize()
             desc = desc.strip()
             if category in categories:
-                categories[category].append(f"  `!{command.name}` — {desc}")
+                categories[category].append(f"  `{config.PREFIX}{command.name}` — {desc}")
         except ValueError:
             continue
             
@@ -190,16 +191,14 @@ class Information(commands.Cog):
         embed.add_field(name=f"<:Bot:1416777544870396016> Bot Name", value=self.bot.user.name, inline=True)
         embed.add_field(name=f"<:ID:1416777985167724687> ID", value=self.bot.user.id, inline=True)
         embed.add_field(name=f"<:Creator:1416783996440023050> Creator", value="Soumetsu.#8818", inline=True)
-        embed.add_field(name=f"<:Wrench:1416781024381112513> Prefix", value="`!`", inline=True)
+        embed.add_field(name=f"<:Wrench:1416781024381112513> Prefix", value=f"`{config.PREFIX}`", inline=True)
         embed.add_field(name=f"<:Globe:1416781731616526356> Servers", value=f"{len(self.bot.guilds)}", inline=True)
         embed.add_field(name=f"<:Clock:1416782289672732772> Uptime", value=uptime_str, inline=True)
 
         file = discord.File(os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi.gif"),filename="kurumi.gif")
 
         await ctx.send(file=file, embed=embed)
-
-
-        
+    
 async def setup(bot):
     await bot.add_cog(Information(bot))
-    print("📦 Loaded information cog.")
+    
