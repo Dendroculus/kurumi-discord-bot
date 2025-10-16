@@ -162,14 +162,29 @@ class Moderator(commands.Cog):
     @commands.has_permissions(kick_members=True)
     @app_commands.describe(member="The member to kick", reason="The reason for the kick")
     async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
+        if member == ctx.author:
+            return await ctx.send("You can't kick yourself.")
+        if member == ctx.guild.owner:
+            return await ctx.send("You can't kick the server owner.")
+        if member == ctx.bot.user:
+            return await ctx.send("You can't make me kick myself.")
         await member.kick(reason=reason)
         await ctx.send(f"👢 {member.mention} has been kicked. Reason: {reason}")
+        
+
 
     @commands.hybrid_command(name="ban", help="Moderator:Ban a member")
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     @app_commands.describe(member="The member to ban", reason="The reason for the ban")
     async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
+        if member == ctx.author:
+            return await ctx.send("You can't ban yourself.")
+        if member == ctx.guild.owner:
+            return await ctx.send("You can't ban the server owner.")
+        if member == ctx.bot.user:
+            return await ctx.send("You can't make me ban myself.")
+        
         await member.ban(reason=reason)
         await ctx.send(f"🔨 {member.mention} has been banned. Reason: {reason}")
 
@@ -352,4 +367,4 @@ class Moderator(commands.Cog):
         await ctx.send(f"✅ Role {role.mention} was given access to this channel.")
         
 async def setup(bot):
-    await bot.add_cog(Moderator(bot))   
+    await bot.add_cog(Moderator(bot))
