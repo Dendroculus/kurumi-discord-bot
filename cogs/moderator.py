@@ -5,11 +5,11 @@ from collections import defaultdict
 from typing import Optional
 import re
 from datetime import timedelta
-
 import logging
 from utils.database import db
 from utils.moderation_utils import enforce_punishments
 
+NO_REASON = "No reason provided"
 SPLIT_RE = re.compile(r'[,\n;|]+')
 MENTION_RE = re.compile(r'<@!?(?P<id>\d+)>')
 ID_RE = re.compile(r'^\d{17,20}$')
@@ -35,7 +35,7 @@ class AuditLogView(discord.ui.View):
             return "Unknown Integration"
         try:
             return str(target)
-        except:
+        except Exception:
             return "Unknown"
 
     def get_page_embed(self):
@@ -131,7 +131,7 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(moderate_members=True)
     @app_commands.describe(member="The member to timeout", duration="Duration (e.g., 10s, 5m, 1h, 1d). Defaults to 10m.", reason="The reason for the timeout")
-    async def mute(self, ctx: commands.Context, member: discord.Member, duration: str = "10m", *, reason: str = "No reason provided"):
+    async def mute(self, ctx: commands.Context, member: discord.Member, duration: str = "10m", *, reason: str = NO_REASON):
         delta = self.parse_duration(duration)
         if not delta:
             return await ctx.send("❌ Invalid duration. Use numbers followed by s, m, h, or d (e.g., `10s`, `5m`).")
@@ -161,7 +161,7 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     @app_commands.describe(member="The member to kick", reason="The reason for the kick")
-    async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
+    async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = NO_REASON):
         if member == ctx.author:
             return await ctx.send("You can't kick yourself.")
         if member == ctx.guild.owner:
@@ -177,7 +177,7 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     @app_commands.describe(member="The member to ban", reason="The reason for the ban")
-    async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
+    async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = NO_REASON):
         if member == ctx.author:
             return await ctx.send("You can't ban yourself.")
         if member == ctx.guild.owner:
@@ -192,7 +192,7 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(member="The member to warn", reason="The reason for the warning")
-    async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
+    async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str = NO_REASON):
         if member.bot:
             return await ctx.send("🤖 You can't warn a bot.")
 

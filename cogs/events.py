@@ -148,7 +148,6 @@ class Events(commands.Cog):
         if self.bot.user.mentioned_in(message) and not message.reference:
             if self.can_respond(message.author.id, is_dm=False, channel_id=message.channel.id):
                 await self._handle_mention(message)
-            return
 
     async def _handle_dm(self, message: discord.Message) -> bool:
         if not self.can_respond(message.author.id, is_dm=True):

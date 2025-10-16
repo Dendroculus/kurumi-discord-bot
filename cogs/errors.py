@@ -9,9 +9,7 @@ logger = logging.getLogger("bot")
 
 def is_handled(key, ttl=60):
     now = time.time()
-    for k in list(handled_errors.keys()):
-        if now - handled_errors[k] >= ttl:
-            handled_errors.pop(k, None)
+    handled_errors.update({k: t for k, t in handled_errors.items() if now - t < ttl})
 
     if key in handled_errors and now - handled_errors[key] < ttl:
         return True
@@ -41,8 +39,7 @@ class ErrorHandler(commands.Cog):
         elif isinstance(error, commands.BadArgument):
             await ctx.send("❌ Invalid argument. Check your input.")
         elif isinstance(error, commands.CommandNotFound):
-            if not ctx.message.content.startswith("/"):
-                pass
+            return
         else:
             await ctx.send("❌ An unexpected error occurred.")
             logger.exception("Unhandled error in '%s': %s", ctx.command, error)
