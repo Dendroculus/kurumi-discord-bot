@@ -20,6 +20,8 @@ class Misc(commands.Cog):
 
     @commands.hybrid_command(name="cats", help="Miscellaneous: Shows a random cat image")
     async def cats(self, ctx: commands.Context):
+        if ctx.interaction:
+            await ctx.defer()
         async with aiohttp.ClientSession() as session:
             async with session.get("https://api.thecatapi.com/v1/images/search") as resp:
                 if resp.status == 200:
@@ -32,6 +34,8 @@ class Misc(commands.Cog):
 
     @commands.hybrid_command(name="dogs", help="Miscellaneous: Get a random dog image")
     async def dogs(self, ctx: commands.Context):
+        if ctx.interaction:
+            await ctx.defer()
         async with aiohttp.ClientSession() as session:
             async with session.get("https://dog.ceo/api/breeds/image/random") as resp:
                 if resp.status == 200:
@@ -44,19 +48,22 @@ class Misc(commands.Cog):
                     
     @commands.hybrid_command(name="rabbits", help="Miscellaneous: Get a random rabbit image")
     async def rabbits(self, ctx: commands.Context):
+        if ctx.interaction:
+            await ctx.defer()
         async with aiohttp.ClientSession() as session:
             async with session.get("https://rabbit-api-two.vercel.app/api/random") as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     embed = discord.Embed(title="🐰 Cluck!", color=discord.Color.purple())
-                    embed.set_image(url=data["url"])
+                    embed.set_image(url=data["url"])    
                     await ctx.send(embed=embed)
                 else:
                     await ctx.send("❌ Couldn't fetch a rabbit right now.", ephemeral=True)
                     
     @commands.hybrid_command(name="anime", help="Miscellaneous: Search for an anime by name (AniList)")
     async def anime(self, ctx: commands.Context, *, query: str):
-        """Fetch anime info from AniList GraphQL API"""
+        if ctx.interaction:
+            await ctx.defer()
 
         query_str = """
         query ($search: String) {
@@ -139,19 +146,15 @@ class Misc(commands.Cog):
                 color=discord.Color.blurple()
             )
 
-            # Small thumbnail
             if anime_data.get("coverImage", {}).get("medium"):
                 embed.set_thumbnail(url=anime_data["coverImage"]["medium"])
 
-            # Banner image
             if anime_data.get("bannerImage"):
                 embed.set_image(url=anime_data["bannerImage"])
 
-            # Fields (AniList style)
             embed.add_field(name="Episodes", value=anime_data.get("episodes", "N/A"), inline=True)
             embed.add_field(name="Status", value=anime_data.get("status", "N/A").title(), inline=True)
 
-            # Dates
             start = anime_data.get("startDate", {})
             end = anime_data.get("endDate", {})
             start_str = f"{start.get('year','N/A')}-{start.get('month','??')}-{start.get('day','??')}" if start.get("year") else "N/A"
@@ -164,10 +167,8 @@ class Misc(commands.Cog):
             embed.add_field(name="Source", value=anime_data.get("source", "N/A"), inline=True)
 
             embed.add_field(name="Score", value=f"{anime_data.get('averageScore', 'N/A')}%", inline=True)
-            embed.add_field(name="Popularity", value=str(anime_data.get("popularity", "N/A")), inline=True)
-            embed.add_field(name="Favourites", value=str(anime_data.get("favourites", "N/A")), inline=True)
-
-            # Genres
+            embed.add_field(name="Popularity", value=str(anime_data.get('popularity', "N/A")), inline=True)
+            embed.add_field(name="Favourites", value=str(anime_data.get('favourites', "N/A")), inline=True)
             genres = anime_data.get("genres", [])
             if genres:
                 genres = " ".join(f"`{g}`" for g in genres)
@@ -175,8 +176,6 @@ class Misc(commands.Cog):
                 genres = "N/A"
 
             embed.add_field(name="Genres", value=genres, inline=False)
-
-            # Credits
             embed.set_footer(
                 text="Provided by AniList",
                 icon_url="https://anilist.co/img/icons/android-chrome-512x512.png"
@@ -194,6 +193,8 @@ class Misc(commands.Cog):
     @commands.hybrid_command(name="animecharacter", help="Miscellaneous: Search for an anime character by name")
     @app_commands.describe(query="The name of the anime character to search for")
     async def animecharacter(self, ctx: commands.Context, *, query: str):
+        if ctx.interaction:
+            await ctx.defer()
         async with aiohttp.ClientSession() as session:
             url = f"https://api.jikan.moe/v4/characters?q={query}&limit=5"
             async with session.get(url) as resp:
@@ -217,7 +218,6 @@ class Misc(commands.Cog):
             async def select_callback(interaction: discord.Interaction):
                 mal_id = interaction.data["values"][0]
 
-                # Fetch full details
                 async with aiohttp.ClientSession() as session2:
                     detail_url = f"https://api.jikan.moe/v4/characters/{mal_id}/full"
                     async with session2.get(detail_url) as resp2:
@@ -229,7 +229,6 @@ class Misc(commands.Cog):
                 kanji = char_data.get("name_kanji") or "N/A"
                 about = char_data.get("about") or ""
 
-                # Remove repeated info lines from about
                 cleaned_lines = []
                 for line in about.split("\n"):
                     lower_line = line.lower()
@@ -242,7 +241,6 @@ class Misc(commands.Cog):
                     cutoff = desc[:300].rfind(".")
                     desc = desc[:cutoff+1] if cutoff != -1 else desc[:300] + "..."
 
-                # Extract info fields
                 fields = {}
                 for line in about.split("\n"):
                     if ":" in line:
@@ -251,14 +249,12 @@ class Misc(commands.Cog):
                         if key in ["age", "birthday", "height", "hair color"]:
                             fields[key.capitalize()] = val
 
-                # Voice Actor
                 seiyuu = "N/A"
                 for v in char_data.get("voices", []):
                     if v.get("language") == "Japanese":
                         seiyuu = v["person"]["name"]
                         break
 
-                # Anime appearances
                 anime_list = [a["anime"]["title"] for a in char_data.get("anime", [])]
                 anime_tags = ""
                 if anime_list:
@@ -270,7 +266,6 @@ class Misc(commands.Cog):
 
                 image_url = char_data.get("images", {}).get("jpg", {}).get("image_url")
 
-                # Build embed
                 embed = discord.Embed(
                     title=name,
                     description=desc,
@@ -307,8 +302,5 @@ class Misc(commands.Cog):
             view.add_item(select)
             await ctx.send("🔎 Select a character from the search results:", view=view)
 
-
-
 async def setup(bot):
     await bot.add_cog(Misc(bot))
-    print("📦 Loaded miscellaneous cog.")

@@ -136,6 +136,8 @@ class Manager(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     async def invites(self, ctx: commands.Context):
+        if ctx.interaction:
+            await ctx.defer()
         invites = await ctx.guild.invites()
         embeds = []
 
@@ -167,6 +169,8 @@ class Manager(commands.Cog):
     @commands.has_permissions(manage_guild=True)
     @app_commands.describe(code="Select an invite code or 'all' to delete all invites")
     async def deleteinvite(self, ctx: commands.Context, code: str):
+        if ctx.interaction:
+            await ctx.defer()
         invites = await ctx.guild.invites()
 
         if code.lower() == "all":
@@ -244,7 +248,7 @@ class Manager(commands.Cog):
     @commands.has_permissions(moderate_members=True)
     @app_commands.describe(member="Member to timeout", duration="Duration (e.g., 10s, 5m, 1h, 1d)", reason="Reason for timeout")
     async def timeout(self, ctx: commands.Context, member: discord.Member, duration: str, *, reason: str = "No reason provided"):
-        delta = self.parse_duration(duration)  # use cog helper
+        delta = self.parse_duration(duration)  
         if not delta:
             await ctx.reply("❌ Invalid format. Use numbers followed by s, m, h, or d (e.g., `10s`, `5m`).")
             return
@@ -417,4 +421,3 @@ class Manager(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Manager(bot))
-    print("📦 Loaded manager cog.")
