@@ -4,6 +4,11 @@ from discord import app_commands, PermissionOverwrite, Role, Member
 from collections import defaultdict
 from typing import Optional
 import re
+from datetime import timedelta
+
+import logging
+from utils.database import db
+from utils.moderation_utils import enforce_punishments
 
 SPLIT_RE = re.compile(r'[,\n;|]+')
 MENTION_RE = re.compile(r'<@!?(?P<id>\d+)>')
@@ -82,14 +87,31 @@ class AuditLogView(discord.ui.View):
 class Moderator(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.logger = logging.getLogger("bot")
         if not hasattr(bot, "warnings"):
             bot.warnings = defaultdict(int)
+
+    def parse_duration(self, duration_str: str):
+        match = re.fullmatch(r"(\d+)([smhd])", duration_str)
+        if not match:
+            return None
+        value, unit = int(match.group(1)), match.group(2)
+        if unit == "s":
+            return timedelta(seconds=value)
+        elif unit == "m":
+            return timedelta(minutes=value)
+        elif unit == "h":
+            return timedelta(hours=value)
+        elif unit == "d":
+            return timedelta(days=value)
 
     @commands.hybrid_command(name="nuke", help="Moderator:Nuke the current channel (delete & recreate)")
     @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     @app_commands.describe(channel="The channel to nuke. Defaults to the current channel.")
     async def nuke(self, ctx: commands.Context, channel: discord.TextChannel = None):
+        if ctx.interaction:
+            await ctx.defer()
         target_channel = channel or ctx.channel
         await ctx.send(f"Nuking {target_channel.mention}... this may take a moment.")
 
@@ -104,31 +126,36 @@ class Moderator(commands.Cog):
 
         await new_channel.send(embed=embed)
 
-    @commands.hybrid_command(name="mute", help="Moderator:Mute a member (adds 'Muted' role)")
+    # Replaced role-based mute with built-in timeout for standardization
+    @commands.hybrid_command(name="mute", help="Moderator: Temporarily mute (timeout) a member")
     @commands.guild_only()
-    @commands.has_permissions(manage_roles=True)
-    @app_commands.describe(member="The member to mute", reason="The reason for the mute")
-    async def mute(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
-        muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
-        if not muted_role:
-            await ctx.send("Creating 'Muted' role...")
-            muted_role = await ctx.guild.create_role(name="Muted")
-            for channel in ctx.guild.channels:
-                await channel.set_permissions(muted_role, speak=False, send_messages=False)
-        await member.add_roles(muted_role, reason=reason)
-        await ctx.send(f"🔇 {member.mention} has been muted. Reason: {reason}")
+    @commands.has_permissions(moderate_members=True)
+    @app_commands.describe(member="The member to timeout", duration="Duration (e.g., 10s, 5m, 1h, 1d). Defaults to 10m.", reason="The reason for the timeout")
+    async def mute(self, ctx: commands.Context, member: discord.Member, duration: str = "10m", *, reason: str = "No reason provided"):
+        delta = self.parse_duration(duration)
+        if not delta:
+            return await ctx.send("❌ Invalid duration. Use numbers followed by s, m, h, or d (e.g., `10s`, `5m`).")
+        try:
+            until = discord.utils.utcnow() + delta
+            await member.edit(timed_out_until=until, reason=reason)
+            await ctx.send(f"🔇 {member.mention} has been muted (timeout) for {duration}. Reason: {reason}")
+        except discord.Forbidden:
+            await ctx.send("❌ I don't have permission to timeout this member.")
+        except Exception as e:
+            await ctx.send(f"❌ Failed to timeout: `{e}`")
 
-    @commands.hybrid_command(name="unmute", help="Moderator:Unmute a member")
+    @commands.hybrid_command(name="unmute", help="Moderator: Remove timeout from a member")
     @commands.guild_only()
-    @commands.has_permissions(manage_roles=True)
-    @app_commands.describe(member="The member to unmute")
+    @commands.has_permissions(moderate_members=True)
+    @app_commands.describe(member="The member to untimeout")
     async def unmute(self, ctx: commands.Context, member: discord.Member):
-        muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
-        if muted_role and muted_role in member.roles:
-            await member.remove_roles(muted_role)
+        try:
+            await member.edit(timed_out_until=None, reason="Manual unmute")
             await ctx.send(f"🔊 {member.mention} has been unmuted.")
-        else:
-            await ctx.send("❌ User is not muted.")
+        except discord.Forbidden:
+            await ctx.send("❌ I don't have permission to modify this member.")
+        except Exception as e:
+            await ctx.send(f"❌ Failed to unmute: `{e}`")
 
     @commands.hybrid_command(name="kick", help="Moderator:Kick a member")
     @commands.guild_only()
@@ -146,7 +173,7 @@ class Moderator(commands.Cog):
         await member.ban(reason=reason)
         await ctx.send(f"🔨 {member.mention} has been banned. Reason: {reason}")
 
-    @commands.hybrid_command(name="warn", help="Moderator: Warn a user. 3 warnings will result in a kick")
+    @commands.hybrid_command(name="warn", help="Moderator: Warn a user. Escalation is automatic at thresholds")
     @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(member="The member to warn", reason="The reason for the warning")
@@ -154,28 +181,16 @@ class Moderator(commands.Cog):
         if member.bot:
             return await ctx.send("🤖 You can't warn a bot.")
 
-        guild_id = ctx.guild.id
-        user_id = member.id
-        automod = self.bot.get_cog("AutoMod")
-        if automod:
-            count = await automod.on_message_warn(user_id, guild_id)
-        else:
-            count = 1  
-
+        count = await db.increase_warning(member.id, ctx.guild.id)
         await ctx.send(f"⚠️ {member.mention} has been warned. ({count}/10) Reason: {reason}")
-        if automod:
-            if count == 5:
-                try:
-                    await ctx.guild.kick(member, reason="Too many warnings (5)")
-                    await ctx.send(f"👢 {member.mention} has been kicked for reaching 5 warnings.")
-                except:
-                    pass
-            elif count >= 10:
-                try:
-                    await ctx.guild.ban(member, reason="Too many warnings (10)")
-                    await ctx.send(f"⛔ {member.mention} has been banned for reaching 10 warnings.")
-                except:
-                    pass
+
+        # Apply the same consolidated punishment logic as AutoMod
+        await enforce_punishments(
+            member=member,
+            count=count,
+            channel=ctx.channel,
+            logger=self.logger,
+        )
                         
     async def banned_users_autocomplete(self, interaction, current: str):
         if not interaction.guild:
@@ -190,11 +205,6 @@ class Moderator(commands.Cog):
             if current.lower() in f"{ban.user.name}#{ban.user.discriminator}".lower()
         ][:25] 
         
-    async def clear_user_warnings(self, user_id: int, guild_id: int):
-        automod = self.bot.get_cog("AutoMod")  
-        if automod:
-            await automod.reset_warnings(user_id, guild_id)
-
     @commands.hybrid_command(name="unban",help="Moderator: Unban a user and reset their warnings")
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
@@ -224,7 +234,7 @@ class Moderator(commands.Cog):
 
         try:
             await ctx.guild.unban(target)
-            await self.clear_user_warnings(target.id, ctx.guild.id)
+            await db.reset_warnings(target.id, ctx.guild.id)
             await ctx.send(f"✅ Successfully unbanned {target.mention} and cleared their warnings.")
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to unban this user.")
@@ -343,4 +353,3 @@ class Moderator(commands.Cog):
         
 async def setup(bot):
     await bot.add_cog(Moderator(bot))
-    print("📦 Loaded moderator cog.")
