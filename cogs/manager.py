@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import app_commands, ui, Interaction
 from datetime import timedelta
 import re
+import asyncio
 from typing import Optional
 
 
@@ -31,7 +32,7 @@ color_choices = [
     
 class EmojiCreatorView(ui.View):
     def __init__(self, author: discord.Member):
-        super().__init__(timeout=120)  
+        super().__init__(timeout=120)
         self.author = author
 
     @ui.button(label="Upload Emoji", style=discord.ButtonStyle.primary)
@@ -44,10 +45,9 @@ class EmojiCreatorView(ui.View):
 
         def check(m):
             return m.author == self.author and m.attachments
-
         try:
             msg = await interaction.client.wait_for("message", check=check, timeout=120)
-        except:
+        except asyncio.TimeoutError:
             await interaction.followup.send("Timed out waiting for an attachment.", ephemeral=True)
             return
 
@@ -60,22 +60,19 @@ class EmojiCreatorView(ui.View):
 
         def name_check(m):
             return m.author == self.author and len(m.content) > 0
-
         try:
             name_msg = await interaction.client.wait_for("message", check=name_check, timeout=60)
-        except:
+        except asyncio.TimeoutError:
             await interaction.followup.send("Timed out waiting for emoji name.", ephemeral=True)
             return
 
         emoji_name = name_msg.content
-
         try:
             image_bytes = await attachment.read()
             emoji = await interaction.guild.create_custom_emoji(name=emoji_name, image=image_bytes)
             await interaction.followup.send(f"Emoji created: <:{emoji.name}:{emoji.id}>")
         except Exception as e:
             await interaction.followup.send(f"Failed to create emoji: {e}", ephemeral=True)
-
 
 class InvitePages(ui.View):
     def __init__(self, embeds):
