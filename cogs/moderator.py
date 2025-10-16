@@ -352,4 +352,4 @@ class Moderator(commands.Cog):
         await ctx.send(f"✅ Role {role.mention} was given access to this channel.")
         
 async def setup(bot):
-    await bot.add_cog(Moderator(bot))
+    await bot.add_cog(Moderator(bot))   
