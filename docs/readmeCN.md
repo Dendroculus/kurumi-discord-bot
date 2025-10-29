@@ -4,6 +4,7 @@
 
 Kurumi 是一个用 Python 编写的多功能 Discord 机器人，专注于服务器管理所需的审核、自动化和实用工具。
 
+<img src="https://github.com/Dendroculus/kurumi-discord-bot/blob/main/assets/emojis/kurumichibi.png" width="200" />
 
 
 ## 🌟 功能
