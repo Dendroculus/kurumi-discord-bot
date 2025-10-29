@@ -1,3 +1,5 @@
+EN | [CN](https://github.com/Dendroculus/kurumi-discord-bot/blob/main/docs/readmeCN.md)
+
 # Kurumi Discord Bot
 
 <img src="assets/emojis/kurumichibi.png" width="200" />
