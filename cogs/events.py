@@ -89,7 +89,7 @@ class Events(commands.Cog):
             await self.bot.change_presence(activity=discord.CustomActivity(name="ara ara konnichiwa"))
         except Exception:
             pass
-        self.logger.info("Logged in as %s", self.bot.user)
+        self.logger.info("✅ Logged in as %s", self.bot.user)
         try:
             synced = await self.bot.tree.sync()
             self.logger.info("Synced %d slash commands.", len(synced))
@@ -200,4 +200,4 @@ class Events(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Events(bot))
-    logging.getLogger("bot").info("Loaded events cog.")
+    logging.getLogger("bot").info("Loaded events cogs.events")

@@ -4,7 +4,9 @@ from discord import app_commands
 from discord.ui import View, Select
 import aiohttp
 from typing import Any, Dict, List, Optional
+import asyncio
 
+    
 ANILIST_API = "https://graphql.anilist.co"
 ANILIST_SEARCH_QUERY = """
 query ($search: String) {
@@ -34,6 +36,154 @@ query ($search: String) {
 }
 """
 
+ANILIST_CHARACTER_SEARCH_QUERY = """
+query ($search: String) {
+  Page(perPage: 5) {
+    characters(search: $search) {
+      id
+      name {
+        full
+        native
+      }
+      description
+      image {
+        large
+        medium
+      }
+      gender
+      dateOfBirth {
+        year
+        month
+        day
+      }
+      age
+      bloodType
+      siteUrl
+      favourites
+      media(perPage: 4, sort: POPULARITY_DESC) {
+        nodes {
+          title {
+            romaji
+            english
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+class CharacterSelectView(View):
+    def __init__(self, items: List[discord.SelectOption], characters: List[Dict[str, Any]]):
+        super().__init__()
+        self.by_id = {str(c["id"]): c for c in characters}
+        select = Select(placeholder="Choose a character...", options=items)
+        select.callback = self._on_select
+        self.add_item(select)
+
+    async def _on_select(self, interaction: discord.Interaction):
+        """Handle character selection from dropdown."""
+        await interaction.response.defer()
+        
+        char_id = interaction.data["values"][0]
+        char_data = self.by_id.get(char_id)
+        
+        if not char_data:
+            return await interaction.followup.send("❌ Character not found.", ephemeral=True)
+
+        embed = self._build_character_embed(char_data)
+        await interaction. edit_original_response(embed=embed, view=None)
+
+    @staticmethod
+    def _clean_description(desc: str) -> str:
+        """Clean and truncate character description."""
+        if not desc:
+            return "No description available."
+        
+        # Remove HTML tags and BBCode
+        cleaned = desc.replace("<br>", "\n").replace("<i>", "*").replace("</i>", "*")
+        cleaned = cleaned.replace("~!", "||").replace("! ~", "||")  # AniList spoiler tags
+        
+        # Truncate to 300 chars
+        if len(cleaned) > 300:
+            cut_pos = cleaned[:300].rfind(".")
+            if cut_pos != -1:
+                return cleaned[:cut_pos + 1]
+            return cleaned[:297] + "..."
+        return cleaned
+
+    @staticmethod
+    def _format_date(date_obj: Optional[Dict[str, Optional[int]]]) -> str:
+        """Format birth date."""
+        if not date_obj:
+            return "N/A"
+        
+        year = date_obj.get("year") or "?"
+        month = date_obj.get("month") or "?"
+        day = date_obj.get("day") or "?"
+        
+        return f"{year}-{month:02d}-{day:02d}" if all([year != "?", month != "?", day != "?"]) else "N/A"
+
+    @staticmethod
+    def _format_media_list(media_nodes: List[Dict[str, Any]]) -> str:
+        """Format anime/manga appearances."""
+        if not media_nodes:
+            return "`N/A`"
+        
+        titles = []
+        for node in media_nodes[:4]:
+            title = node.get("title", {}).get("english") or node.get("title", {}).get("romaji") or "Unknown"
+            titles.append(f"`{title}`")
+        
+        result = " ".join(titles)
+        if len(media_nodes) > 4:
+            result += " ..."
+        return result
+
+    def _build_character_embed(self, cd: Dict[str, Any]) -> discord.Embed:
+        """Build character embed from AniList data."""
+        name = cd.get("name", {}).get("full") or "Unknown"
+        native = cd.get("name", {}).get("native") or "N/A"
+        description = self._clean_description(cd.get("description"))
+        url = cd.get("siteUrl")
+        
+        embed = discord.Embed(
+            title=name,
+            url=url,
+            description=description,
+            color=discord.Color.blurple()
+        )
+        
+        # Thumbnail
+        image_url = cd.get("image", {}).get("large") or cd.get("image", {}).get("medium")
+        if image_url:
+            embed.set_thumbnail(url=image_url)
+        
+        # Info fields
+        gender = cd.get("gender") or "N/A"
+        age = cd.get("age") or "N/A"
+        blood_type = cd.get("bloodType") or "N/A"
+        birthday = self._format_date(cd.get("dateOfBirth"))
+        
+        info_text = f"**Gender:** {gender}\n**Age:** {age}\n**Birthday:** {birthday}\n**Blood Type:** {blood_type}"
+        embed.add_field(name="📋 Info", value=info_text, inline=True)
+        
+        # Native name and favorites
+        details_text = f"**Native:** {native}\n**Favorites:** {cd.get('favourites', 'N/A')}"
+        embed.add_field(name="📊 Details", value=details_text, inline=True)
+        
+        # Media appearances
+        media_nodes = cd.get("media", {}).get("nodes", [])
+        media_text = self._format_media_list(media_nodes)
+        embed.add_field(name="📺 Appearances", value=media_text, inline=False)
+        
+        embed.set_footer(
+            text="Provided by AniList",
+            icon_url="https://anilist.co/img/icons/android-chrome-512x512.png"
+        )
+        
+        return embed
+    
 class Misc(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -208,134 +358,49 @@ class Misc(commands.Cog):
 
         await ctx.send("Select an anime from the search results:", view=AnimeSelectView(options, results))
 
-    @commands.hybrid_command(name="animecharacter", help="Miscellaneous: Search for an anime character by name")
-    @app_commands.describe(query="The name of the anime character to search for")
+    @commands. hybrid_command(name="animecharacter", help="Miscellaneous: Search for an anime character by name")
+    @app_commands. describe(query="The name of the anime character to search for")
     async def animecharacter(self, ctx: commands.Context, *, query: str):
         await self._defer_if_slash(ctx)
 
-        async with aiohttp.ClientSession() as session:
-            url = f"https://api.jikan.moe/v4/characters?q={query}&limit=5"
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    return await ctx.send("❌ Could not fetch character info right now.")
-                data = await resp.json()
+        try:
+            variables = {"search": query}
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    ANILIST_API,
+                    json={"query": ANILIST_CHARACTER_SEARCH_QUERY, "variables": variables}
+                ) as resp:
+                    if resp.status != 200:
+                        return await ctx.send("❌ Could not fetch character info right now.")
+                    data = await resp.json()
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            return await ctx.send("❌ An error occurred while fetching character info.")
 
-        results = data.get("data") or []
+        results = data.get("data", {}).get("Page", {}).get("characters", []) or []
+        
         if not results:
             return await ctx.send(f"❌ No results found for `{query}`.")
 
+        options = self._build_character_select_options(results)
+        view = CharacterSelectView(options, results)
+        await ctx.send("🔎 Select a character from the search results:", view=view)
+
+
+    def _build_character_select_options(self, results: List[Dict[str, Any]]) -> List[discord.SelectOption]:
+        """Build select menu options from character search results."""
         options: List[discord.SelectOption] = []
         for char in results:
-            name = char.get("name") or "Unknown"
-            kanji = char.get("name_kanji") or "N/A"
+            name = char.get("name", {}).get("full") or "Unknown"
+            native = char.get("name", {}).get("native") or ""
+            
             options.append(
                 discord.SelectOption(
                     label=name[:100],
-                    description=f"Kanji: {kanji}"[:100],
-                    value=str(char["mal_id"]),
+                    description=f"Native: {native}"[:100] if native else "Character",
+                    value=str(char["id"]),
                 )
             )
-
-        class CharacterSelectView(View):
-            def __init__(self, items: List[discord.SelectOption]):
-                super().__init__()
-                select = Select(placeholder="Choose a character...", options=items)
-
-                async def _on_select(interaction: discord.Interaction):
-                    mal_id = interaction.data["values"][0]
-                    detail_url = f"https://api.jikan.moe/v4/characters/{mal_id}/full"
-                    async with aiohttp.ClientSession() as s2:
-                        async with s2.get(detail_url) as resp2:
-                            if resp2.status != 200:
-                                return await Misc._reply_ephemeral(interaction, "❌ Could not fetch details.")
-                            char_data = (await resp2.json()).get("data", {}) or {}
-                    if not char_data:
-                        return await Misc._reply_ephemeral(interaction, "❌ Character details not found.")
-
-                    embed = self._build_character_embed(char_data)
-                    await interaction.response.edit_message(embed=embed, view=None)
-
-                select.callback = _on_select
-                self.add_item(select)
-
-            @staticmethod
-            def _clean_about(about: str) -> str:
-                if not about:
-                    return ""
-                cleaned = []
-                for line in about.split("\n"):
-                    lower = line.lower()
-                    if any(k in lower for k in ["age:", "height:", "birthday:", "hair color:", "eye color:"]):
-                        continue
-                    cleaned.append(line.strip())
-                text = " ".join(cleaned).replace("<br>", " ").replace("<i>", "").replace("</i>", "")
-                if len(text) > 300:
-                    cut = text[:300].rfind(".")
-                    return (text[:cut + 1] if cut != -1 else text[:300]) + ("..." if cut == -1 else "")
-                return text
-
-            @staticmethod
-            def _extract_fields(about: str) -> Dict[str, str]:
-                fields: Dict[str, str] = {}
-                if not about:
-                    return fields
-                for line in about.split("\n"):
-                    if ":" in line:
-                        key, val = line.split(":", 1)
-                        key, val = key.strip().lower(), val.strip()
-                        if key in ["age", "birthday", "height", "hair color"]:
-                            fields[key.capitalize()] = val
-                return fields
-
-            def _build_character_embed(self, cd: Dict[str, Any]) -> discord.Embed:
-                name = cd.get("name") or "Unknown"
-                kanji = cd.get("name_kanji") or "N/A"
-                about = cd.get("about") or ""
-                desc = self._clean_about(about)
-
-                fields = self._extract_fields(about)
-                seiyuu = "N/A"
-                for v in cd.get("voices", []) or []:
-                    if v.get("language") == "Japanese":
-                        seiyuu = v["person"]["name"]
-                        break
-
-                anime_list = [a["anime"]["title"] for a in cd.get("anime", []) or []]
-                if anime_list:
-                    anime_tags = " ".join(f"`{a}`" for a in anime_list[:4]) + (" ..." if len(anime_list) > 4 else "")
-                else:
-                    anime_tags = "`N/A`"
-
-                image_url = cd.get("images", {}).get("jpg", {}).get("image_url")
-
-                embed = discord.Embed(title=name, description=desc, color=discord.Color.blurple())
-                if image_url:
-                    embed.set_thumbnail(url=image_url)
-
-                info_left = []
-                if "Age" in fields:
-                    info_left.append(f"**Age:** {fields['Age']}")
-                if "Height" in fields:
-                    info_left.append(f"**Height:** {fields['Height']}")
-                if "Birthday" in fields:
-                    info_left.append(f"**Birthday:** {fields['Birthday']}")
-                if "Hair color" in fields:
-                    info_left.append(f"**Hair Color:** {fields['Hair color']}")
-
-                info_right = f"**Kanji:** {kanji}\n**Seiyuu:** {seiyuu}\n"
-
-                if info_left:
-                    embed.add_field(name="Info", value="\n".join(info_left), inline=True)
-                embed.add_field(name="Details", value=info_right, inline=True)
-
-                embed.add_field(name="📺 Anime Appearances", value=anime_tags, inline=False)
-                embed.set_footer(
-                    text="Provided by Jikan API",
-                    icon_url="https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png",
-                )
-                return embed
-
-        await ctx.send("🔎 Select a character from the search results:", view=CharacterSelectView(options))
+        return options
 
 async def setup(bot):
     await bot.add_cog(Misc(bot))
