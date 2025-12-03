@@ -19,6 +19,10 @@ ENV/
 .env
 *.env
 
+# database files
+*.sqlite3
+/data
+
 # Logs
 *.log
 
