@@ -368,8 +368,7 @@ class Misc(commands.Cog):
 
     def cog_unload(self) -> None:
         if not self.session.closed:
-            asyncio.create_task(self.session.close())
-
+            asyncio.ensure_future(self.session.close())
 
     @staticmethod
     async def _defer_if_slash(ctx: commands.Context) -> None:
