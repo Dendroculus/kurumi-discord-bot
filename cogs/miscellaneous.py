@@ -365,10 +365,11 @@ class Misc(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session: aiohttp.ClientSession = aiohttp.ClientSession()
+        self._session_close_task: Optional[asyncio.Task] = None
 
     def cog_unload(self) -> None:
         if not self.session.closed:
-            asyncio.ensure_future(self.session.close())
+            self._session_close_task = asyncio.create_task(self.session.close())
 
     @staticmethod
     async def _defer_if_slash(ctx: commands.Context) -> None:
