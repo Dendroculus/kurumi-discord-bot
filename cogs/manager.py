@@ -6,6 +6,25 @@ import re
 import asyncio
 from typing import Optional
 
+"""
+manager.py
+
+Server manager cog providing utilities for server administrators.
+
+Responsibilities:
+- Create and manage invites, roles, and channel settings.
+- Provide interactive utilities such as emoji creation and paginated invite displays.
+- Expose management commands with appropriate permission checks and helpful UX.
+
+Key classes and functions:
+- EmojiCreatorView: interactive flow for uploading and creating a guild emoji.
+- InvitePages: simple paginated view for browsing embeds (used for invites output).
+- Manager: Cog exposing hybrid commands to manage slowmode, invites, roles, nicknames, timeouts, channel names, and role colors.
+
+Notes:
+- Commands use both text/hybrid and application command conveniences (autocomplete, choices).
+- This module intentionally does not alter Discord objects beyond the explicit administrative actions; permission errors are handled and reported to the invoking user.
+"""
 
 color_choices = [
     app_commands.Choice(name="Red", value="#FF0000"),
@@ -31,12 +50,32 @@ color_choices = [
 ]
     
 class EmojiCreatorView(ui.View):
+    """
+    Interactive view guiding a user through creating a custom guild emoji.
+
+    Flow:
+    1. User clicks 'Upload Emoji' button.
+    2. The view prompts the user to upload an attachment (PNG/JPG/GIF, <= 256KB).
+    3. The view prompts the user to provide a name for the emoji.
+    4. The bot attempts to create the emoji in the invoking guild and reports success/failure.
+
+    Only the interaction author may use the provided controls; timeouts are enforced by the view (120s).
+    """
     def __init__(self, author: discord.Member):
         super().__init__(timeout=120)
         self.author = author
 
     @ui.button(label="Upload Emoji", style=discord.ButtonStyle.primary)
     async def upload_emoji(self, interaction: Interaction, button: ui.Button):
+        """
+        Handle the upload button interaction.
+
+        Security/UX:
+        - Ensures only the original command author can proceed.
+        - Uses wait_for to capture the next message from the same author containing an attachment.
+        - Validates file size (<=256KB) and collects the emoji name before creating.
+        - Reports errors back to the author via ephemeral followups when appropriate.
+        """
         if interaction.user != self.author:
             await interaction.response.send_message("Only the command author can use this button.", ephemeral=True)
             return
@@ -75,6 +114,14 @@ class EmojiCreatorView(ui.View):
             await interaction.followup.send(f"Failed to create emoji: {e}", ephemeral=True)
 
 class InvitePages(ui.View):
+    """
+    Simple paginated view for a list of embeds.
+
+    Usage:
+    - Initialize with a list of embeds.
+    - Presents previous/next buttons to cycle through pages (wrap-around behavior).
+    - Shows a page indicator button (disabled).
+    """
     def __init__(self, embeds):
         super().__init__(timeout=None)
         self.embeds = embeds
@@ -92,11 +139,13 @@ class InvitePages(ui.View):
         self.add_item(self.next_btn)
 
     async def go_prev(self, interaction: Interaction):
+        """Go to the previous embed page (wraps to the end)."""
         self.index = (self.index - 1) % len(self.embeds)
         self.page_btn.label = f"{self.index + 1}/{len(self.embeds)}"
         await interaction.response.edit_message(embed=self.embeds[self.index], view=self)
 
     async def go_next(self, interaction: Interaction):
+        """Go to the next embed page (wraps to the start)."""
         self.index = (self.index + 1) % len(self.embeds)
         self.page_btn.label = f"{self.index + 1}/{len(self.embeds)}"
         await interaction.response.edit_message(embed=self.embeds[self.index], view=self)
@@ -115,6 +164,20 @@ color_choices = [
 ]
 
 class Manager(commands.Cog):
+    """
+    Management cog exposing administrative commands for server maintainers.
+
+    Commands include:
+    - slowmode: set channel slowmode delay
+    - invites/createinvite/deleteinvite: manage server invites
+    - rolename/setnick: edit roles and nicknames
+    - timeout: apply moderation timeouts by duration string
+    - createrole/assignrole/delrole: create, assign, and remove/delete roles
+    - listmods: list roles with moderation permissions
+    - nick: change the bot's nickname
+    - rolecolor: change a role's color using predefined choices
+    - renamechannel: rename a text channel
+    """
     def __init__(self, bot):
         self.bot = bot
 
@@ -123,6 +186,7 @@ class Manager(commands.Cog):
     @commands.has_permissions(manage_channels=True)
     @app_commands.describe(seconds="The slowmode delay in seconds (0 to disable)", channel="The channel to apply slowmode to")
     async def slowmode(self, ctx: commands.Context, seconds: int, channel: discord.TextChannel = None):
+        """Set the slowmode delay for a text channel (0 to disable)."""
         target_channel = channel or ctx.channel
         if seconds < 0 or seconds > 21600:
             return await ctx.send("⚠️ Slowmode must be between 0 and 21600 seconds.")
@@ -133,6 +197,7 @@ class Manager(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     async def invites(self, ctx: commands.Context):
+        """List active server invites and present them as paginated embeds."""
         if ctx.interaction:
             await ctx.defer()
         invites = await ctx.guild.invites()
@@ -157,6 +222,7 @@ class Manager(commands.Cog):
     @commands.has_permissions(manage_guild=True)
     @app_commands.describe(channel="Channel to create invite for", max_uses="Max uses (0 = unlimited)", max_age="Expiry time in seconds (0 = never)")
     async def createinvite(self, ctx: commands.Context, channel: discord.TextChannel = None, max_uses: int = 0, max_age: int = 0):
+        """Create a new invite for a channel with optional max uses and expiry."""
         channel = channel or ctx.channel
         invite = await channel.create_invite(max_uses=max_uses, max_age=max_age)
         await ctx.send(f"✅ Created invite link: {invite.url}")
@@ -166,6 +232,7 @@ class Manager(commands.Cog):
     @commands.has_permissions(manage_guild=True)
     @app_commands.describe(code="Select an invite code or 'all' to delete all invites")
     async def deleteinvite(self, ctx: commands.Context, code: str):
+        """Delete a specific invite by code or delete all invites when 'all' is provided."""
         if ctx.interaction:
             await ctx.defer()
         invites = await ctx.guild.invites()
@@ -186,6 +253,11 @@ class Manager(commands.Cog):
 
     @deleteinvite.autocomplete('code')
     async def autocomplete_invite_code(self, interaction: discord.Interaction, current: str):
+        """
+        Autocomplete handler for invite codes.
+
+        Returns a list of matching invite code choices based on current input.
+        """
         try:
             invites = await interaction.guild.invites()
             if not invites:
@@ -209,6 +281,7 @@ class Manager(commands.Cog):
     @commands.has_permissions(manage_roles=True)
     @app_commands.describe(role="The role to rename", new_name="The new name for the role")
     async def rolename(self, ctx: commands.Context, role: discord.Role, *, new_name: str):
+        """Rename a role to a new name, handling permission errors gracefully."""
         try:
             await role.edit(name=new_name)
             await ctx.send(f"✏️ Renamed role to `{new_name}`.")
@@ -220,6 +293,7 @@ class Manager(commands.Cog):
     @commands.has_permissions(manage_nicknames=True)
     @app_commands.describe(member="The member to change the nickname of", nickname="The new nickname for the member")
     async def setnick(self, ctx: commands.Context, member: discord.Member, *, nickname: str):
+        """Change a member's nickname (requires manage_nicknames permission)."""
         try:
             await member.edit(nick=nickname)
             await ctx.send(f"✏️ Nickname for {member.mention} changed to `{nickname}`.")
@@ -227,6 +301,14 @@ class Manager(commands.Cog):
             await ctx.send("❌ I don't have permission to change that user's nickname.")
 
     def parse_duration(self, duration_str):
+        """
+        Parse a compact duration string into a timedelta.
+
+        Accepted formats: <number>[s|m|h|d], e.g. "10s", "5m", "1h", "1d".
+
+        Returns:
+            datetime.timedelta or None if parsing fails.
+        """
         match = re.fullmatch(r"(\d+)([smhd])", duration_str)
         if not match:
             return None
@@ -245,6 +327,11 @@ class Manager(commands.Cog):
     @commands.has_permissions(moderate_members=True)
     @app_commands.describe(member="Member to timeout", duration="Duration (e.g., 10s, 5m, 1h, 1d)", reason="Reason for timeout")
     async def timeout(self, ctx: commands.Context, member: discord.Member, duration: str, *, reason: str = "No reason provided"):
+        """
+        Apply a communication timeout (mute) to a member for a parsed duration.
+
+        Duration must be in the compact format accepted by parse_duration.
+        """
         delta = self.parse_duration(duration)  
         if not delta:
             await ctx.reply("❌ Invalid format. Use numbers followed by s, m, h, or d (e.g., `10s`, `5m`).")
@@ -260,6 +347,11 @@ class Manager(commands.Cog):
             await ctx.reply(f"❌ Failed to timeout: `{e}`")
 
     async def role_autocomplete(self, interaction: discord.Interaction, current: str):
+        """
+        Autocomplete helper that returns role names matching the current input.
+
+        Returns up to 25 choices.
+        """
         roles = [role for role in interaction.guild.roles if current.lower() in role.name.lower()]
         return [
             app_commands.Choice(name=role.name, value=role.name)
@@ -275,6 +367,11 @@ class Manager(commands.Cog):
     )
     @app_commands.choices(color=color_choices)
     async def createrole(self, ctx: commands.Context, role_name: str, color: Optional[app_commands.Choice[str]] = None):
+        """
+        Create a role in the guild. Optionally apply a preset color selection.
+
+        If the role already exists, informs the caller instead of creating a duplicate.
+        """
         guild = ctx.guild
         role = discord.utils.get(guild.roles, name=role_name)
 
@@ -299,6 +396,7 @@ class Manager(commands.Cog):
     )
     @app_commands.autocomplete(role_name=role_autocomplete)
     async def assignrole(self, ctx: commands.Context, role_name: str, member: Optional[discord.Member] = None):
+        """Assign an existing role (by name) to a specified member."""
         guild = ctx.guild
         if guild is None:
             return await ctx.send("❌ This command must be used in a server.")
@@ -339,6 +437,12 @@ class Manager(commands.Cog):
         action: app_commands.Choice[str],
         member: discord.Member = None
     ):
+        """
+        Modify a role based on the selected action:
+        - remove_all: remove role from every member who has it.
+        - choose: remove role from a specific provided member.
+        - delete: delete the role from the guild.
+        """
         try:
             if action.value == "remove_all":
                 removed_count = 0
@@ -367,6 +471,7 @@ class Manager(commands.Cog):
     @commands.hybrid_command(name="listmods", help="Manager:List all moderators")
     @commands.guild_only()
     async def listmods(self, ctx: commands.Context):
+        """List roles that have message moderation permissions (manage_messages)."""
         mod_roles = [role.mention for role in ctx.guild.roles if role.permissions.manage_messages and not role.is_default()]
         if mod_roles:
             await ctx.send("🛡️ Moderator Roles:\n" + "\n".join(mod_roles))
@@ -378,6 +483,7 @@ class Manager(commands.Cog):
     @commands.has_permissions(manage_nicknames=True)
     @app_commands.describe(new_nick="The new nickname for the bot")
     async def nick(self, ctx: commands.Context, *, new_nick: str):
+        """Change the bot's nickname in the guild (requires manage_nicknames)."""
         try:
             await ctx.guild.me.edit(nick=new_nick)
             await ctx.send(f"✅ Changed nickname to `{new_nick}`.")
@@ -390,6 +496,7 @@ class Manager(commands.Cog):
     @app_commands.describe(role="The role to change the color of", color="The new color to apply")
     @app_commands.choices(color=color_choices)
     async def rolecolor(self, ctx: commands.Context, role: discord.Role, color: app_commands.Choice[str]):
+        """Change a role's color according to a preset color choice and report the change with an embed."""
         try:
             hex_value = color.value.lstrip("#")
             hex_color = discord.Color(int(hex_value, 16))
@@ -410,6 +517,7 @@ class Manager(commands.Cog):
     @commands.has_permissions(manage_channels=True)
     @app_commands.describe(channel="The channel to rename", new_name="The new name for the channel")
     async def renamechannel(self, ctx:commands.Context, channel: discord.TextChannel, *, new_name: str):
+        """Rename a text channel; reports permission errors to the caller."""
         try:
             await channel.edit(name=new_name)
             await ctx.send(f"✏️ Renamed channel to `{new_name}`.")

@@ -9,12 +9,41 @@ import logging
 from utils.database import db
 from utils.moderation_utils import enforce_punishments
 
+"""
+moderator.py
+
+Moderator cog providing common moderation utilities and audit inspection helpers.
+
+Responsibilities:
+- Provide moderation commands: nuke, mute/unmute (timeouts), kick, ban, warn, unban.
+- Channel and role management commands: lock/unlock channels, create/delete channels, add role permissions for locked channels.
+- Role management: create, assign, rename, delete role-related actions are covered in manager.py; this cog focuses on moderator actions.
+- Audit log viewing: paginated, ephemeral view of recent audit log entries for authorized users.
+- Integrates with `utils.database.db` for warning persistence and `utils.moderation_utils.enforce_punishments`
+  to apply escalation logic based on warning counts.
+
+Notes:
+- The cog expects the bot to have permission to perform the requested actions; permission errors are caught and reported.
+- Time durations are parsed using compact strings like '10s', '5m', '1h', '1d'.
+- This file only adds documentation; no logic or behavior has been modified.
+"""
+
 NO_REASON = "No reason provided"
 SPLIT_RE = re.compile(r'[,\n;|]+')
 MENTION_RE = re.compile(r'<@!?(?P<id>\d+)>')
 ID_RE = re.compile(r'^\d{17,20}$')
 
+
 class AuditLogView(discord.ui.View):
+    """
+    Paginated ephemeral view to browse audit log entries.
+
+    Attributes:
+        entries: list of AuditLogEntry objects (from discord.py).
+        ctx: command context that invoked the view (used to restrict interactions to the author).
+        per_page: number of entries per page to display.
+        current_page: currently displayed page index.
+    """
     def __init__(self, entries, ctx, per_page=10):
         super().__init__(timeout=180)
         self.entries = entries
@@ -27,6 +56,11 @@ class AuditLogView(discord.ui.View):
         self.update_buttons()
         
     def format_target(self, target):
+        """
+        Produce a human-friendly representation of an audit log entry target.
+
+        Handles multiple possible target types (Member/Role/Integration/Object) and falls back to str().
+        """
         if hasattr(target, "name"):
             return target.name
         if isinstance(target, discord.PartialIntegration):
@@ -39,6 +73,11 @@ class AuditLogView(discord.ui.View):
             return "Unknown"
 
     def get_page_embed(self):
+        """
+        Build a discord.Embed representing the current page of audit log entries.
+
+        Each entry displays the acting user, the target, the action type, and the reason (if any).
+        """
         start = self.current_page * self.per_page
         end = start + self.per_page
         page_entries = self.entries[start:end]
@@ -57,6 +96,7 @@ class AuditLogView(discord.ui.View):
         return embed
 
     def update_buttons(self):
+        """Enable/disable the pagination buttons according to the current page index."""
         for child in self.children:
             if child.label == "Previous":
                 child.disabled = self.current_page == 0
@@ -65,6 +105,11 @@ class AuditLogView(discord.ui.View):
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.danger)
     async def prev_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Show the previous audit log page.
+
+        Only the original command author may use the pagination controls.
+        """
         if interaction.user.id != self.author.id:
             await interaction.response.send_message("❌ You can't use these buttons.", ephemeral=True)
             return
@@ -76,6 +121,11 @@ class AuditLogView(discord.ui.View):
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.danger)
     async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Show the next audit log page.
+
+        Only the original command author may use the pagination controls.
+        """
         if interaction.user.id != self.author.id:
             await interaction.response.send_message("❌ You can't use these buttons.", ephemeral=True)
             return
@@ -84,7 +134,24 @@ class AuditLogView(discord.ui.View):
             self.update_buttons()
             await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
 
+
 class Moderator(commands.Cog):
+    """
+    Moderator cog implementing core moderation commands and helpers.
+
+    Commands included:
+    - nuke: clone & delete a channel
+    - mute/unmute: timeout/untimeout members
+    - kick/ban/unban: basic member bans and unbans
+    - warn: increment persisted warning count and apply punishments
+    - lock/unlock: restrict channel viewing/sending to top role/admins
+    - deletechannel/createchannel: manage text channels
+    - clearchat: bulk message deletion
+    - auditlog: ephemeral paginated audit log viewing
+    - addlockedmember: allow a role to access an already-locked channel
+
+    The cog also exposes parse_duration helper for compact duration strings.
+    """
     def __init__(self, bot):
         self.bot = bot
         self.logger = logging.getLogger("bot")
@@ -92,6 +159,12 @@ class Moderator(commands.Cog):
             bot.warnings = defaultdict(int)
 
     def parse_duration(self, duration_str: str):
+        """
+        Parse a compact duration string like '10s', '5m', '1h', or '1d' into a timedelta.
+
+        Returns:
+            datetime.timedelta or None if parsing fails.
+        """
         match = re.fullmatch(r"(\d+)([smhd])", duration_str)
         if not match:
             return None
@@ -110,6 +183,10 @@ class Moderator(commands.Cog):
     @commands.has_permissions(manage_channels=True)
     @app_commands.describe(channel="The channel to nuke. Defaults to the current channel.")
     async def nuke(self, ctx: commands.Context, channel: discord.TextChannel = None):
+        """
+        Clone and delete the target channel (default: current channel), then post a short
+        notification embed in the newly created channel.
+        """
         if ctx.interaction:
             await ctx.defer()
         target_channel = channel or ctx.channel
@@ -132,6 +209,9 @@ class Moderator(commands.Cog):
     @commands.has_permissions(moderate_members=True)
     @app_commands.describe(member="The member to timeout", duration="Duration (e.g., 10s, 5m, 1h, 1d). Defaults to 10m.", reason="The reason for the timeout")
     async def mute(self, ctx: commands.Context, member: discord.Member, duration: str = "10m", *, reason: str = NO_REASON):
+        """
+        Apply a timeout (communication disable) to a member for a parsed duration.
+        """
         delta = self.parse_duration(duration)
         if not delta:
             return await ctx.send("❌ Invalid duration. Use numbers followed by s, m, h, or d (e.g., `10s`, `5m`).")
@@ -149,6 +229,7 @@ class Moderator(commands.Cog):
     @commands.has_permissions(moderate_members=True)
     @app_commands.describe(member="The member to untimeout")
     async def unmute(self, ctx: commands.Context, member: discord.Member):
+        """Remove a timeout from a member."""
         try:
             await member.edit(timed_out_until=None, reason="Manual unmute")
             await ctx.send(f"🔊 {member.mention} has been unmuted.")
@@ -162,6 +243,7 @@ class Moderator(commands.Cog):
     @commands.has_permissions(kick_members=True)
     @app_commands.describe(member="The member to kick", reason="The reason for the kick")
     async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = NO_REASON):
+        """Kick a member from the guild with basic safety checks (self/owner/bot)."""
         if member == ctx.author:
             return await ctx.send("You can't kick yourself.")
         if member == ctx.guild.owner:
@@ -172,12 +254,12 @@ class Moderator(commands.Cog):
         await ctx.send(f"👢 {member.mention} has been kicked. Reason: {reason}")
         
 
-
     @commands.hybrid_command(name="ban", help="Moderator:Ban a member")
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     @app_commands.describe(member="The member to ban", reason="The reason for the ban")
     async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = NO_REASON):
+        """Ban a member from the guild with basic safety checks."""
         if member == ctx.author:
             return await ctx.send("You can't ban yourself.")
         if member == ctx.guild.owner:
@@ -193,6 +275,11 @@ class Moderator(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(member="The member to warn", reason="The reason for the warning")
     async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str = NO_REASON):
+        """
+        Issue a persistent warning to a member and run the same escalation logic used by AutoMod.
+
+        Persists a warning count via utils.database.db.increase_warning and calls enforce_punishments.
+        """
         if member.bot:
             return await ctx.send("🤖 You can't warn a bot.")
 
@@ -208,6 +295,11 @@ class Moderator(commands.Cog):
         )
                         
     async def banned_users_autocomplete(self, interaction, current: str):
+        """
+        Autocomplete helper returning recently banned users for the unban command.
+
+        Returns up to 25 matching choices based on the current input.
+        """
         if not interaction.guild:
             return []
         bans = [ban async for ban in interaction.guild.bans()]
@@ -226,6 +318,9 @@ class Moderator(commands.Cog):
     @app_commands.describe(user="Select the user to unban")
     @app_commands.autocomplete(user=banned_users_autocomplete)
     async def unban(self, ctx: commands.Context, *, user: str):
+        """
+        Unban a user by ID or username#discriminator and reset their persisted warnings.
+        """
         banned_users = [ban async for ban in ctx.guild.bans()]
         target = None
 
@@ -261,6 +356,11 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     async def lock(self, ctx: commands.Context):
+        """
+        Lock the current text channel by setting restrictive permission overwrites.
+
+        The default role is denied view/send; the guild's top role and administrators retain access.
+        """
         channel = ctx.channel
         guild = ctx.guild
 
@@ -286,6 +386,7 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     async def unlock(self, ctx: commands.Context):
+        """Restore send_messages permission for the default role to unlock the channel."""
         await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
         await ctx.send("🔓 Channel is now unlocked.")
 
@@ -293,6 +394,9 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     async def deletechannel(self, ctx: commands.Context, channel: discord.TextChannel = None):
+        """
+        Delete the specified channel (or current channel). Notifies the command author via DM when possible.
+        """
         target_channel = channel or ctx.channel
         channel_name = target_channel.name
 
@@ -310,6 +414,7 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
     async def createchannel(self, ctx: commands.Context, name: str, category: discord.CategoryChannel = None):
+        """Create a new text channel optionally under a specified category."""
         target_category = category or ctx.channel.category
         new_channel = await ctx.guild.create_text_channel(name=name, category=target_category)
         await ctx.send(f"✅ Channel `{new_channel.name}` created in `{target_category.name if target_category else 'No Category'}`.")
@@ -319,6 +424,10 @@ class Moderator(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(limit="Number of messages to clear")
     async def clearchat(self, ctx: commands.Context, limit: int = 100):
+        """
+        Bulk delete recent messages in the current channel up to the provided limit.
+        Caps the limit to 500 to avoid excessive purges.
+        """
         if limit > 500 : 
             limit = 500
         
@@ -330,6 +439,11 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(view_audit_log=True)
     async def auditlog(self, ctx: commands.Context):
+        """
+        Ephemeral command to fetch recent audit log entries and present them in a paginated view.
+
+        For security, prefers slash invocation (checks ctx.interaction) and returns an ephemeral response.
+        """
         if ctx.interaction is None:
             return await ctx.send("❌ Please use `/auditlog` (slash command) for better security.")
         entries = [entry async for entry in ctx.guild.audit_logs(limit=300)]
@@ -352,6 +466,13 @@ class Moderator(commands.Cog):
         role: Optional[discord.Role] = None,
         send_messages: bool = True
     ):
+        """
+        Grant a role access to a channel that has been locked with the `lock` command.
+
+        Args:
+            role: Role to grant access to.
+            send_messages: Whether the role should also be allowed to send messages.
+        """
         channel = ctx.channel
 
         if role is None:
