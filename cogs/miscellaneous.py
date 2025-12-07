@@ -74,9 +74,25 @@ query ($search: String) {
 """
 
 
+"""
+miscellaneous.py
+
+Collection of utility commands and AniList-backed search functionality.
+
+Responsibilities:
+- Provide friendly embeds and search flows for anime and characters using the AniList GraphQL API.
+- Offer small miscellaneous commands that fetch images from public APIs (cats, dogs, rabbits).
+- Contain helpers for cleaning and formatting text, dates, and select-based UI interactions.
+
+Notes:
+- Network calls are performed via an internal aiohttp.ClientSession created by the cog.
+- The GenericSelectView bridges a Select UI and an embed builder callback to show detailed results.
+- TextUtils centralizes common formatting and truncation logic for safe embed content.
+"""
+
 
 class TextUtils:
-    """Utility helpers for text, dates, and formatting."""
+    """Utility helpers for text, dates, and formatting used by embed builders."""
 
     @staticmethod
     def clean_description(
@@ -85,6 +101,18 @@ class TextUtils:
         preserve_spoilers: bool = False,
         short_truncate: Optional[int] = None,
     ) -> str:
+        """
+        Clean HTML-like tags from AniList descriptions and optionally truncate.
+
+        Args:
+            desc: raw description text (may contain simple tags like <br>, <i>).
+            limit: hard upper bound for returned string length (suitable for embed descriptions).
+            preserve_spoilers: if True, attempt to convert AniList-style spoilers into Discord spoilers.
+            short_truncate: if set, performs a softer semantic truncation at sentence boundary near this length.
+
+        Returns:
+            A cleaned, safely truncated string suitable for use as an embed description.
+        """
         if not desc:
             desc = "No description available."
 
@@ -114,8 +142,9 @@ class TextUtils:
     @staticmethod
     def format_date_full(d: Optional[Dict[str, Optional[int]]]) -> str:
         """
-        Format a date dict as YYYY-MM-DD, or N/A when incomplete or missing.
-        This is stricter and used where we want only full dates.
+        Format a full date dict as YYYY-MM-DD, or 'N/A' when incomplete/missing.
+
+        Expects dicts with keys 'year', 'month', 'day'. Returns 'N/A' unless all parts are present.
         """
         if not d:
             return "N/A"
@@ -132,8 +161,9 @@ class TextUtils:
     @staticmethod
     def format_date_loose(d: Optional[Dict[str, Optional[int]]]) -> str:
         """
-        Looser date formatting (keeps '??' style placeholders if partial).
-        Used for anime start/end dates where partial info is acceptable.
+        Looser date formatter that tolerates partial dates and returns a YYYY-M-D style string.
+
+        Missing month/day will appear as '??' to indicate unknown parts.
         """
         if d and d.get("year"):
             year = d.get("year", "N/A")
@@ -144,22 +174,23 @@ class TextUtils:
 
     @staticmethod
     def opt(value: Any, fallback: str = "N/A") -> str:
+        """Return a stringified value or a fallback when the value is None/empty."""
         return str(value) if value not in (None, "", []) else fallback
 
     @staticmethod
     def genres_to_text(genres: List[str]) -> str:
+        """Convert a list of genre strings into a concise formatted inline text block."""
         if not genres:
             return "N/A"
         return " ".join(f"`{g}`" for g in genres)
 
 
-
 class GenericSelectView(View):
     """
     Generic select view that:
-    - Takes pre-built SelectOptions
-    - Maps IDs to raw data entries
-    - Uses an embed_builder callback to construct the final embed
+    - Accepts pre-built SelectOptions and corresponding raw entries.
+    - Maps the option value (id) back to the raw entry.
+    - Uses an embed_builder callback to produce the detailed embed for the chosen entry.
     """
 
     def __init__(
@@ -170,6 +201,14 @@ class GenericSelectView(View):
         placeholder: str = "Choose an option...",
         timeout: Optional[float] = 180.0,
     ):
+        """
+        Args:
+            items: list of discord.SelectOption to show to the user.
+            entries: list of raw data dicts; each dict must contain an 'id' key.
+            embed_builder: callable that accepts a single entry and returns a discord.Embed.
+            placeholder: select placeholder text.
+            timeout: optional view timeout in seconds.
+        """
         super().__init__(timeout=timeout)
         self.by_id = {str(e["id"]): e for e in entries}
         self.embed_builder = embed_builder
@@ -179,6 +218,7 @@ class GenericSelectView(View):
         self.add_item(select)
 
     async def _on_select(self, interaction: discord.Interaction):
+        """Handle a user's selection by building and editing the original response with the chosen embed."""
         await interaction.response.defer()
 
         selected_id = interaction.data["values"][0]
@@ -197,7 +237,7 @@ class GenericSelectView(View):
 # ---------- Character embed helpers ----------
 
 def build_character_embed(cd: Dict[str, Any]) -> discord.Embed:
-    """Build character embed from AniList data."""
+    """Build a rich character embed from AniList character data dictionary."""
     name = cd.get("name", {}).get("full") or "Unknown"
     native = cd.get("name", {}).get("native") or "N/A"
 
@@ -250,7 +290,7 @@ def build_character_embed(cd: Dict[str, Any]) -> discord.Embed:
 
 
 def format_character_media_list(media_nodes: List[Dict[str, Any]]) -> str:
-    """Format anime/manga appearances for character embeds."""
+    """Format the list of media appearances for character embeds into a short string."""
     if not media_nodes:
         return "`N/A`"
 
@@ -270,7 +310,7 @@ def format_character_media_list(media_nodes: List[Dict[str, Any]]) -> str:
 
 
 def build_character_select_options(results: List[Dict[str, Any]]) -> List[discord.SelectOption]:
-    """Select menu options from character search results."""
+    """Convert character search results into SelectOption instances for a Select menu."""
     options: List[discord.SelectOption] = []
     for char in results:
         name = char.get("name", {}).get("full") or "Unknown"
@@ -286,8 +326,8 @@ def build_character_select_options(results: List[Dict[str, Any]]) -> List[discor
     return options
 
 
-
 def build_anime_embed(anime: Dict[str, Any]) -> discord.Embed:
+    """Construct an embed presenting anime details from AniList media data."""
     title = anime["title"]["english"] or anime["title"]["romaji"]
     url = anime.get("siteUrl")
     description = TextUtils.clean_description(anime.get("description", ""))
@@ -347,6 +387,7 @@ def build_anime_embed(anime: Dict[str, Any]) -> discord.Embed:
 
 
 def build_anime_options(results: List[Dict[str, Any]]) -> List[discord.SelectOption]:
+    """Create SelectOption choices from anime search results for use in a Select menu."""
     options: List[discord.SelectOption] = []
     for anime in results:
         title = anime["title"]["english"] or anime["title"]["romaji"]
@@ -362,23 +403,39 @@ def build_anime_options(results: List[Dict[str, Any]]) -> List[discord.SelectOpt
     return options
 
 class Misc(commands.Cog):
+    """
+    Miscellaneous fun and utility commands.
+
+    Highlights:
+    - Image fetchers: cats, dogs, rabbits
+    - AniList-backed search: anime, animecharacter (uses GraphQL)
+    - Avatar command for users
+    - Uses an internal aiohttp.ClientSession; the session is closed on cog unload.
+    """
     def __init__(self, bot):
         self.bot = bot
         self.session: aiohttp.ClientSession = aiohttp.ClientSession()
         self._session_close_task: Optional[asyncio.Task] = None
 
     def cog_unload(self) -> None:
+        """Ensure the aiohttp session is closed when the cog is unloaded (schedules close as a background task)."""
         if not self.session.closed:
             self._session_close_task = asyncio.create_task(self.session.close())
 
     @staticmethod
     async def _defer_if_slash(ctx: commands.Context) -> None:
+        """
+        Helper used by hybrid commands to defer interactions when invoked as a slash command.
+
+        This prevents the interaction from timing out while an HTTP request is in progress.
+        """
         interaction = getattr(ctx, "interaction", None)
         if interaction is not None and not interaction.response.is_done():
             await interaction.response.defer()
 
     @staticmethod
     async def _reply_ephemeral(interaction: discord.Interaction, content: str) -> None:
+        """Send an ephemeral reply to an interaction, using followup if the initial response is already sent."""
         if not interaction.response.is_done():
             await interaction.response.send_message(content, ephemeral=True)
         else:
@@ -388,6 +445,7 @@ class Misc(commands.Cog):
     @commands.hybrid_command(name="avatar", help="Miscellaneous: Show avatar of a user")
     @app_commands.describe(user="The user to get the avatar of. Defaults to you.")
     async def avatar(self, ctx: commands.Context, user: discord.User = None):
+        """Show the avatar image for the specified user or the command author."""
         target = user or ctx.author
         embed = discord.Embed(title=f"{target.name}'s Avatar", color=discord.Color.purple())
         embed.set_image(url=target.display_avatar.url)
@@ -395,6 +453,7 @@ class Misc(commands.Cog):
 
     @commands.hybrid_command(name="cats", help="Miscellaneous: Shows a random cat image")
     async def cats(self, ctx: commands.Context):
+        """Fetch a random cat image from a public API and send it in an embed."""
         await self._defer_if_slash(ctx)
 
         try:
@@ -411,6 +470,7 @@ class Misc(commands.Cog):
 
     @commands.hybrid_command(name="dogs", help="Miscellaneous: Get a random dog image")
     async def dogs(self, ctx: commands.Context):
+        """Fetch a random dog image and send it as an embed."""
         await self._defer_if_slash(ctx)
 
         try:
@@ -427,6 +487,7 @@ class Misc(commands.Cog):
 
     @commands.hybrid_command(name="rabbits", help="Miscellaneous: Get a random rabbit image")
     async def rabbits(self, ctx: commands.Context):
+        """Fetch a random rabbit image and send it as an embed."""
         await self._defer_if_slash(ctx)
 
         try:
@@ -443,6 +504,7 @@ class Misc(commands.Cog):
 
     @commands.hybrid_command(name="anime", help="Miscellaneous: Search for an anime by name (AniList)")
     async def anime(self, ctx: commands.Context, *, query: str):
+        """Search AniList for anime matching the query and present a selectable list to the user."""
         await self._defer_if_slash(ctx)
 
         variables = {"search": query}
@@ -473,6 +535,7 @@ class Misc(commands.Cog):
     @commands.hybrid_command(name="animecharacter", help="Miscellaneous: Search for an anime character by name")
     @app_commands.describe(query="The name of the anime character to search for")
     async def animecharacter(self, ctx: commands.Context, *, query: str):
+        """Search AniList for characters matching the query and present a selectable result list."""
         await self._defer_if_slash(ctx)
 
         try:

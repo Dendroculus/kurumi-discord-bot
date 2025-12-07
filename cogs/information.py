@@ -6,9 +6,43 @@ from discord.ui import View, Button
 import os
 from utils import config
 
+"""
+information.py
+
+Provides informational and utility commands for the Kurumi Discord bot.
+
+Responsibilities:
+- Generate context-aware help pages from registered commands and present them in a paginated View.
+- Provide basic server and bot information commands:
+  - membercount: show current server member count
+  - serverstats: detailed server statistics embed
+  - member: list members in a given role (capped)
+  - ping: show bot latency
+  - help: interactive/help pages (hybrid command)
+  - info: bot information and uptime
+
+Integration expectations:
+- Commands should include a help string in the format "Category: Description" for inclusion in help pages.
+- utils.config should provide PREFIX used to format shown command usage.
+- Assets directory contains "kurumi.gif" used by the info command; when missing, sending the file will raise as usual.
+"""
+
 start_time = time.time()
         
 def generate_help_pages(bot_instance):
+    """
+    Build a list of Embed pages representing categorized command help.
+
+    The function examines commands registered on `bot_instance` and expects the
+    command.help string to be formatted as "Category:Description". Recognized
+    categories are "Information", "Manager", "Moderator" and "Miscellaneous".
+
+    Args:
+        bot_instance: The Bot instance whose commands will be inspected.
+
+    Returns:
+        List[discord.Embed]: Embeds for each non-empty command category ready to be sent.
+    """
     categories = {"Information": [], "Manager": [], "Moderator": [], "Miscellaneous": []}
     
     all_commands = bot_instance.commands
@@ -36,6 +70,14 @@ def generate_help_pages(bot_instance):
     return pages
 
 class HelpView(View):
+    """
+    Interactive paginated view for displaying help pages with previous/next/delete controls.
+
+    Usage:
+    - Instantiate with `pages` (list of discord.Embed) and the requesting `author`.
+    - The view enforces that only the original author may use the navigation buttons.
+    - The Delete button removes the message (owner-only).
+    """
     def __init__(self, pages, author):
         super().__init__(timeout=None)
         self.pages = pages
@@ -53,6 +95,7 @@ class HelpView(View):
         self.next_btn = Button(label=">", style=discord.ButtonStyle.danger)
         self.delete_button = Button(label="Delete", style=discord.ButtonStyle.danger)
 
+        # Assign callbacks to button interactions
         self.prev_btn.callback = self.prev_button
         self.next_btn.callback = self.next_button
         self.delete_button.callback = self.handle_delete
@@ -65,17 +108,24 @@ class HelpView(View):
         self._update_buttons()
 
     def _update_buttons(self):
+        """Enable/disable navigation buttons and update the page indicator label."""
         self.prev_btn.disabled = self.current_page == 0
         self.next_btn.disabled = self.current_page == len(self.pages) - 1
         self.page_btn.label = f"{self.current_page + 1}/{len(self.pages)}"
 
     async def on_timeout(self):
+        """Disable all child controls when the view times out and edit the message to apply the change."""
         for item in self.children:
             item.disabled = True
         if self.message:
             await self.message.edit(view=self)
 
     async def prev_button(self, interaction: discord.Interaction):
+        """
+        Navigate to the previous page.
+
+        Only the original author may operate the controls.
+        """
         if interaction.user.id != self.author.id:
             return await interaction.response.send_message("❌ You can't use these buttons.", ephemeral=True)
         self.current_page -= 1
@@ -83,6 +133,11 @@ class HelpView(View):
         await interaction.response.edit_message(embed=self.pages[self.current_page], view=self)
 
     async def next_button(self, interaction: discord.Interaction):
+        """
+        Navigate to the next page.
+
+        Only the original author may operate the controls.
+        """
         if interaction.user.id != self.author.id:
             return await interaction.response.send_message("❌ You can't use these buttons.", ephemeral=True)
         self.current_page += 1
@@ -90,23 +145,42 @@ class HelpView(View):
         await interaction.response.edit_message(embed=self.pages[self.current_page], view=self)
         
     async def handle_delete(self, interaction: discord.Interaction):
+        """
+        Delete the message containing the help view.
+
+        Only the original author may delete the message. The interaction is deferred
+        before performing the deletion to provide a responsive UX.
+        """
         if interaction.user.id != self.author.id:
             return await interaction.response.send_message("❌ You can't delete this message.", ephemeral=True)
         await interaction.response.defer()
         await interaction.message.delete()
         
 class Information(commands.Cog):
+    """
+    Cog exposing informational commands about the server and the bot.
+
+    Commands:
+    - membercount: Display total members in the guild.
+    - serverstats: Send an embed with several guild statistics.
+    - member: List members belonging to a role (max 90 shown).
+    - ping: Show bot latency in milliseconds.
+    - help: Show categorized command list (interactive).
+    - info: Show bot identity, uptime, and other metadata.
+    """
     def __init__(self, bot):
         self.bot = bot
 
     @commands.hybrid_command(name="membercount", help="Information:Shows total member count in the server")
     @commands.guild_only()
     async def membercount(self, ctx: commands.Context):
+        """Send a short message with the guild's member count."""
         await ctx.send(f"👥 This server has **{ctx.guild.member_count}** members.")
             
     @commands.hybrid_command(name="serverstats", help="Information:Shows server statistics")
     @commands.guild_only()
     async def serverstats(self, ctx: commands.Context):
+        """Send an embed containing several useful server statistics."""
         guild = ctx.guild
         embed = discord.Embed(title=f"Server Stats — {guild.name}", color=discord.Color.purple())
         if guild.icon:
@@ -126,6 +200,13 @@ class Information(commands.Cog):
     @commands.guild_only()
     @app_commands.describe(role="The role to list members from")
     async def member(self, ctx: commands.Context, role: discord.Role):
+        """
+        List members in the provided role, up to a safe cap to avoid overly long messages.
+
+        Args:
+            ctx: command context.
+            role: discord.Role whose members will be listed.
+        """
         if not role.members:
             return await ctx.send(f"❌ No members found in the `{role.name}` role.")
 
@@ -141,6 +222,7 @@ class Information(commands.Cog):
 
     @commands.hybrid_command(name="ping", help="Information:Shows bot latency")
     async def ping(self, ctx: commands.Context):
+        """Respond with the bot's websocket latency in milliseconds."""
         latency = round(self.bot.latency * 1000)
         await ctx.send(f"🏓 Pong! `{latency}ms`")
 
@@ -153,6 +235,12 @@ class Information(commands.Cog):
         app_commands.Choice(name="Miscellaneous", value="miscellaneous"),
     ])
     async def commands_hybrid(self, ctx: commands.Context, category: app_commands.Choice[str] = None):
+        """
+        Display the help pages or a single category.
+
+        If a category is provided and found, a single page is sent. Otherwise an
+        interactive HelpView is created to allow the user to navigate pages.
+        """
         pages = generate_help_pages(self.bot)
         if not pages:
             return await ctx.send("No commands available to show.")
@@ -176,6 +264,13 @@ class Information(commands.Cog):
 
     @commands.hybrid_command(name="info", help="Information:Shows bot information")
     async def info(self, ctx):
+        """
+        Show bot information including uptime, server count, prefix, and other metadata.
+
+        Reads the 'kurumi.gif' asset from the repository's assets directory and sends it
+        alongside the embed. If the file is missing, the File constructor will raise
+        as normal; the command intentionally does not swallow that error.
+        """
         uptime_seconds = int(time.time() - start_time)
         hours, remainder = divmod(uptime_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -201,4 +296,3 @@ class Information(commands.Cog):
     
 async def setup(bot):
     await bot.add_cog(Information(bot))
-    

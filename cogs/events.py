@@ -7,9 +7,51 @@ from typing import Optional
 import logging
 from utils import config
 
+"""
+events.py
+
+Event handling cog for the Kurumi Discord bot.
+
+Responsibilities:
+- Handle bot lifecycle events (on_ready) and member join/welcome flow.
+- Monitor messages for profanity and delete offending messages.
+- Respond to DMs and mentions with configurable cooldowns and optional GIF assets.
+- Preloads small binary assets (GIFs) from a configured assets directory to avoid
+  file I/O on every event.
+
+Integration expectations:
+- utils.config must provide ASSETS_DIR (path-like), WELCOME_CHANNEL_NAME, and other configuration values.
+- better_profanity.profanity is used to detect profanity in messages.
+- The bot is expected to be a discord.ext.commands.Bot instance with application commands available for sync.
+"""
 
 class Events(commands.Cog):
+    """
+    Cog that handles various Discord events: ready, member join, and message handling.
+
+    Key behaviors:
+    - Preloads assets (GIFs) referenced by key names ("welcome", "mention", "dm") into memory.
+    - Enforces per-user and per-channel cooldowns to avoid spamming responses for mentions and DMs.
+    - Deletes messages that contain profanity and notifies the user in-channel.
+    - Replies to direct messages with a private "this bot is for servers only" response.
+    - Replies to mentions with a friendly embed and optional GIF.
+
+    Attributes:
+        bot: the bot instance.
+        mention_cooldown / dm_cooldown / global_cooldown / channel_cooldown:
+            cooldown durations (in seconds) for different response types.
+        mention_cooldowns, dm_cooldowns, global_cooldowns, channel_cooldowns:
+            dicts mapping IDs to last-response timestamps.
+        gifs: mapping of asset key -> bytes for preloaded GIFs.
+        logger: logger instance used for diagnostics.
+    """
     def __init__(self, bot: commands.Bot):
+        """
+        Initialize the Events cog.
+
+        Args:
+            bot: The Bot instance this cog will be attached to.
+        """
         self.bot = bot
 
         self.mention_cooldown = 30
@@ -27,6 +69,12 @@ class Events(commands.Cog):
         self._preload_assets()
 
     def _preload_assets(self) -> None:
+        """
+        Load configured asset files into memory.
+
+        Looks up file names relative to config.ASSETS_DIR. Missing assets are logged
+        at WARNING level; unexpected errors during load are logged at ERROR level.
+        """
         base_path = config.ASSETS_DIR
         files = {
             "welcome": "kurumi1.gif",
@@ -44,15 +92,44 @@ class Events(commands.Cog):
                 self.logger.exception("Error loading asset %s: %s", path, e)
 
     def _file_from_bytes(self, name: str, bytes_data: bytes) -> discord.File:
+        """
+        Create a discord.File from in-memory bytes.
+
+        Args:
+            name: filename to present to Discord clients.
+            bytes_data: raw bytes to wrap.
+
+        Returns:
+            discord.File: file object suitable for sending in messages.
+        """
         return discord.File(io.BytesIO(bytes_data), filename=name)
 
     def _now(self) -> float:
+        """Return the current time as a float timestamp (wrapper around time.time)."""
         return time.time()
 
     def _update_global(self, user_id: int) -> None:
+        """Record the current time as the last global response time for a user."""
         self.global_cooldowns[user_id] = self._now()
 
     def can_respond(self, user_id: int, *, is_dm: bool = False, channel_id: Optional[int] = None) -> bool:
+        """
+        Determine whether the bot should respond to a mention or DM for a specific user.
+
+        Rules:
+        - Enforce a per-user global cooldown to prevent bursts across channels.
+        - Optionally enforce a per-channel cooldown.
+        - Enforce separate cooldowns for mentions vs DMs.
+        - If responding is allowed, update relevant cooldown timestamps.
+
+        Args:
+            user_id: ID of the user initiating the interaction.
+            is_dm: True if this is a direct message; False for mentions.
+            channel_id: Optional channel id for per-channel cooldown checks.
+
+        Returns:
+            bool: True if the bot may respond, False otherwise.
+        """
         now = self._now()
 
         last_global = self.global_cooldowns.get(user_id, 0)
@@ -85,6 +162,14 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        """
+        Event fired when the bot is fully ready.
+
+        - Attempts to set a playful custom activity (silently ignores failures).
+        - Logs successful login.
+        - Attempts to sync application commands and logs the number synced; unexpected
+          errors during sync are logged for investigation.
+        """
         try:
             await self.bot.change_presence(activity=discord.CustomActivity(name="ara ara konnichiwa"))
         except Exception:
@@ -98,6 +183,13 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
+        """
+        Welcome new members in the configured welcome channel.
+
+        If a preloaded welcome GIF exists, the bot sends an embed with the GIF attached;
+        otherwise it falls back to a plain text welcome message. Permission errors are
+        silently ignored; other exceptions are logged.
+        """
         channel = discord.utils.get(member.guild.text_channels, name=config.WELCOME_CHANNEL_NAME)
         if not channel:
             return
@@ -121,6 +213,16 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        """
+        Central message handler for moderation and simple interactions.
+
+        Behavior:
+        - Ignores bot messages.
+        - If the message is a recognized command (context valid), does nothing here.
+        - For DMs, delegates to _handle_dm.
+        - If profanity is detected, attempts to delete the message and notify the user.
+        - If the bot is mentioned (and message is not a reply), checks cooldowns and may respond.
+        """
         if message.author.bot:
             return
 
@@ -150,6 +252,18 @@ class Events(commands.Cog):
                 await self._handle_mention(message)
 
     async def _handle_dm(self, message: discord.Message) -> bool:
+        """
+        Respond to a direct message with a private embed explaining the bot is server-only.
+
+        Sends a GIF if preloaded; handles Forbidden/HTTP exceptions gracefully and
+        returns True when a response was sent or attempted.
+
+        Args:
+            message: the DM message received.
+
+        Returns:
+            bool: True if a DM response was sent or attempted, False if rate-limited.
+        """
         if not self.can_respond(message.author.id, is_dm=True):
             return False
 
@@ -179,6 +293,12 @@ class Events(commands.Cog):
             return True
 
     async def _handle_mention(self, message: discord.Message) -> None:
+        """
+        Reply to a mention in a guild channel with a friendly embed and optional GIF.
+
+        Args:
+            message: The message that mentioned the bot.
+        """
         gif = self.gifs.get("mention")
         embed = discord.Embed(description="Hello there, how can I help you today Master? ✨", color=discord.Color.purple())
 
@@ -200,4 +320,4 @@ class Events(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Events(bot))
-    logging.getLogger("bot").info("Loaded events cogs.events")
+    logging.getLogger("bot").info("Loaded events cog.")
