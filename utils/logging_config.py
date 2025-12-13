@@ -32,6 +32,5 @@ def setup_logging() -> logging.Logger:
 
     logging.getLogger("discord.client").setLevel(logging.WARNING)
     logging.getLogger("discord.gateway").setLevel(logging.WARNING)
-    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
 
     return logger

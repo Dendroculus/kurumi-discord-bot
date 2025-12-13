@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
 
-# Optional: load .env if available
 try:
-    from dotenv import load_dotenv  # type: ignore
+    from dotenv import load_dotenv  
     load_dotenv()
 except Exception:
     pass
 
-# Project root = directory of this file's parent
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT_DIR.parent
 
@@ -22,7 +19,9 @@ ASSETS_DIR = PROJECT_ROOT / "assets"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-DB_PATH = DATA_DIR / os.environ.get("DB_FILENAME", "automod.db")
+DB_PATH = DATA_DIR / os.environ.get("DB_FILENAME", "automod.db")  # legacy SQLite path
+POSTGRES_CONN_STRING = os.environ.get("POSTGRE_CONN_STRING")  # e.g. postgres://user:pass@host:port/dbname
+USE_POSTGRES = bool(POSTGRES_CONN_STRING)  # switch based on presence of the conn string
 
 LOG_FILE = LOG_DIR / os.environ.get("LOG_FILENAME", "bot.log")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
