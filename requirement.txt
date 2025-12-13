@@ -1,4 +1,5 @@
 discord.py
-better_profanity
+better-profanity
 aiohttp
 python-dotenv
+asyncpg
