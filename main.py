@@ -17,7 +17,7 @@ def get_command_description(help_text):
         return help_text.split(":", 1)[1].strip()
     return help_text or "No description available."
 
-class KurumiBot(commands.Bot):
+class KurumiBot(commands.AutoShardedBot):
     def __init__(self):
         super().__init__(command_prefix='!', intents=intents, help_command=None)
 
