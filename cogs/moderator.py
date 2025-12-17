@@ -6,6 +6,7 @@ from typing import Optional
 import re
 from datetime import timedelta
 import logging
+from utils.config import MAX_WARNINGS
 from utils.database import db
 from utils.moderation_utils import enforce_punishments
 
@@ -284,7 +285,7 @@ class Moderator(commands.Cog):
             return await ctx.send("🤖 You can't warn a bot.")
 
         count = await db.increase_warning(member.id, ctx.guild.id)
-        await ctx.send(f"⚠️ {member.mention} has been warned. ({count}/10) Reason: {reason}")
+        await ctx.send(f"⚠️ {member.mention} has been warned. ({count}/{MAX_WARNINGS}) Reason: {reason}")
 
         # Apply the same consolidated punishment logic as AutoMod
         await enforce_punishments(
@@ -311,7 +312,18 @@ class Moderator(commands.Cog):
             for ban in bans
             if current.lower() in f"{ban.user.name}#{ban.user.discriminator}".lower()
         ][:25] 
-        
+    
+    @commands.hybrid_command(name="removewarnings", help="Moderator: Remove all warnings for a user")
+    @commands.guild_only()
+    @commands.has_permissions(manage_messages=True)
+    @app_commands.describe(member="The member to remove warnings from")
+    async def removewarnings(self, ctx: commands.Context, member: discord.Member):
+        """
+        Remove all warnings for a user.
+        """
+        await db.reset_warnings(member.id, ctx.guild.id)
+        await ctx.send(f"All warnings for {member.mention} have been removed.")
+    
     @commands.hybrid_command(name="unban",help="Moderator: Unban a user and reset their warnings")
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)

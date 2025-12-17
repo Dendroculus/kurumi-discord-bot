@@ -3,9 +3,11 @@ import asyncio
 from collections import defaultdict, deque
 import time
 import logging
-from utils import config                  
-from utils.database import db            
-from utils.moderation_utils import enforce_punishments  
+from typing import Dict, Tuple
+
+from utils import config
+from utils.database import db
+from utils.moderation_utils import enforce_punishments
 
 """
 automod.py
@@ -17,11 +19,19 @@ Responsibilities:
 - Warn users who are spamming and escalate punishments via the moderation utilities.
 - Maintain lightweight in-memory tracking structures and background tasks for time-based operations.
 
+New behavior:
+- Adds a periodic background cleanup task (_periodic_cleanup) that runs every
+  few minutes to remove stale entries from in-memory tracking structures so
+  they don't grow unbounded.
+- Adds cog_unload to cancel background tasks when the cog is unloaded.
+
 Expectations / Integration Points:
 - Expects `utils.config` to provide configuration constants:
     - SPAM_TRACK_MESSAGE_COUNT: number of recent messages to track per user
     - SPAM_WINDOW_SECONDS: time window to consider for spam detection
     - MAX_WARNINGS: maximum warning count before escalations (used only in messages)
+    - (optional) AUTOMOD_CLEANUP_INTERVAL_SECONDS: how often cleanup runs (default 300)
+    - (optional) AUTOMOD_MESSAGE_AGE_SECONDS: how old messages can be before removal
 - Expects `utils.database.db` to provide async methods:
     - increase_warning(user_id, guild_id) -> int
     - get_warnings(user_id, guild_id)
@@ -29,9 +39,6 @@ Expectations / Integration Points:
     - init() used in setup to ensure DB ready
 - Expects `utils.moderation_utils.enforce_punishments` to accept:
     - member, count, channel, logger and handle escalation (mute/kick/ban/etc.)
-
-Notes:
-- This module only adds documentation; no code logic was modified.
 """
 
 class AutoMod(commands.Cog):
@@ -45,13 +52,15 @@ class AutoMod(commands.Cog):
       or when the recent tracked messages are identical.
     - When spam is detected, issues a warning (incrementing a persisted counter)
       and calls enforce_punishments to apply escalation logic.
-    - Prevents immediate duplicate warnings using a short-lived recently_warned set
-      keyed by (guild_id, user_id).
+    - Prevents immediate duplicate warnings using a short-lived recently_warned dict
+      keyed by (guild_id, user_id) -> expiry_timestamp, and a background cleanup
+      task removes stale entries periodically.
+    - Provides cog_unload to cancel background tasks cleanly when the cog is removed.
 
     Attributes:
         bot: the discord bot instance.
         user_messages: defaultdict(user_id -> deque[(content, timestamp)]).
-        recently_warned: set of (guild_id, user_id) to debounce repeated warns.
+        recently_warned: dict[(guild_id, user_id) -> expiry_timestamp] to debounce warns.
         _bg_tasks: set of tracked background asyncio.Task objects.
         logger: logger instance for recording automod actions.
     """
@@ -63,10 +72,21 @@ class AutoMod(commands.Cog):
             bot: The discord.Bot / commands.Bot instance this cog is attached to.
         """
         self.bot = bot
-        self.user_messages = defaultdict(lambda: deque(maxlen=config.SPAM_TRACK_MESSAGE_COUNT))
-        self.recently_warned = set()
+        self.user_messages: Dict[int, deque] = defaultdict(lambda: deque(maxlen=config.SPAM_TRACK_MESSAGE_COUNT))
+        # Map (guild_id, user_id) -> expiry_timestamp
+        self.recently_warned: Dict[Tuple[int, int], float] = {}
         self._bg_tasks = set()
         self.logger = logging.getLogger("bot")
+
+        # Background task defaults (can be overridden via config)
+        self._cleanup_interval = getattr(config, "AUTOMOD_CLEANUP_INTERVAL_SECONDS", 300)  # every 5 minutes
+        # Age after which tracked messages are considered stale and can be removed.
+        # Default to a few times the spam window to be conservative.
+        self._message_age = getattr(
+            config,
+            "AUTOMOD_MESSAGE_AGE_SECONDS",
+            max(getattr(config, "SPAM_WINDOW_SECONDS", 60) * 4, 300),
+        )
 
     def _track_task(self, coro):
         """
@@ -85,41 +105,32 @@ class AutoMod(commands.Cog):
         task.add_done_callback(self._bg_tasks.discard)
         return task
 
+    def _start_background_tasks(self):
+        """
+        Start background tasks used by the cog.
+
+        Called after the cog is added to the bot (setup).
+        """
+        # Start the periodic cleanup task
+        self._track_task(self._periodic_cleanup())
+
     async def on_message_warn(self, user_id: int, guild_id: int) -> int:
         """
         Increment the stored warning count for a user in a guild.
 
         This delegates to the database abstraction and returns the new warning count.
-
-        Args:
-            user_id: Discord user id.
-            guild_id: Discord guild id.
-
-        Returns:
-            int: the updated total warning count for the user.
         """
         return await db.increase_warning(user_id, guild_id)
 
     async def get_warnings(self, user_id: int, guild_id: int):
         """
         Retrieve the current number of warnings for a user in a guild.
-
-        Args:
-            user_id: Discord user id.
-            guild_id: Discord guild id.
-
-        Returns:
-            Value returned by db.get_warnings (implementation-defined, typically int).
         """
         return await db.get_warnings(user_id, guild_id)
 
     async def reset_warnings(self, user_id: int, guild_id: int):
         """
         Reset persisted warnings for a user in a guild.
-
-        Args:
-            user_id: Discord user id.
-            guild_id: Discord guild id.
         """
         await db.reset_warnings(user_id, guild_id)
 
@@ -133,9 +144,6 @@ class AutoMod(commands.Cog):
         - Appends (content, timestamp) to the user's deque.
         - Calls is_spamming to detect spam; if detected and not recently warned,
           warns the user and schedules a short debounce window via clear_recent_warn.
-
-        Args:
-            message: discord.Message instance.
         """
         if message.author.bot or not message.guild:
             return
@@ -146,40 +154,42 @@ class AutoMod(commands.Cog):
 
         self.user_messages[user_id].append((message.content, now))
 
-        if self.is_spamming(user_id) and (guild_id, user_id) not in self.recently_warned:
-            self.recently_warned.add((guild_id, user_id))
+        key = (guild_id, user_id)
+
+        # Expire recently_warned entries inline to avoid false positives
+        expiry = self.recently_warned.get(key)
+        if expiry is not None and expiry <= now:
+            # expired, remove it
+            self.recently_warned.pop(key, None)
+            expiry = None
+
+        if self.is_spamming(user_id) and key not in self.recently_warned:
+            # Set a short debounce expiry. Keep in sync with clear_recent_warn's sleep.
+            debounce_seconds = 5
+            self.recently_warned[key] = now + debounce_seconds
             try:
                 await self.warn_user(message)
             finally:
-                self._track_task(self.clear_recent_warn(guild_id, user_id))
+                # schedule a cleanup task that will remove the key after debounce_seconds
+                self._track_task(self.clear_recent_warn(guild_id, user_id, debounce_seconds))
 
-    async def clear_recent_warn(self, guild_id, user_id):
+    async def clear_recent_warn(self, guild_id, user_id, delay: float):
         """
-        Remove a (guild_id, user_id) tuple from the recently_warned set after a short delay.
+        Remove a (guild_id, user_id) tuple from the recently_warned map after `delay` seconds.
 
         This acts as a debounce to avoid warning the same user repeatedly within a short period.
-
-        Args:
-            guild_id: guild id where the warning occurred.
-            user_id: user id who was warned.
         """
-        await asyncio.sleep(5)
-        self.recently_warned.discard((guild_id, user_id))
+        try:
+            await asyncio.sleep(delay)
+            self.recently_warned.pop((guild_id, user_id), None)
+        except asyncio.CancelledError:
+            # Task was cancelled (likely during cog unload); ensure entry is removed to avoid stale state.
+            self.recently_warned.pop((guild_id, user_id), None)
+            raise
 
     def is_spamming(self, user_id):
         """
         Heuristic to determine whether the given user is spamming.
-
-        Spam detection rules:
-        - If fewer than SPAM_TRACK_MESSAGE_COUNT messages have been recorded, not spam.
-        - If the oldest and newest tracked messages fall within SPAM_WINDOW_SECONDS, consider spam.
-        - If all tracked message contents are identical, consider spam.
-
-        Args:
-            user_id: Discord user id to evaluate.
-
-        Returns:
-            bool: True if the user is considered spamming, False otherwise.
         """
         msgs = self.user_messages[user_id]
         if len(msgs) < config.SPAM_TRACK_MESSAGE_COUNT:
@@ -197,14 +207,6 @@ class AutoMod(commands.Cog):
     async def warn_user(self, message):
         """
         Issue a warning to a user for spamming and call the punishment enforcer.
-
-        Steps:
-        - Increment the persisted warning count for the user.
-        - Send a user-facing warning message to the channel including current/maximum warnings.
-        - Call enforce_punishments to allow escalation based on the new warning count.
-
-        Args:
-            message: discord.Message that triggered the warning.
         """
         user = message.author
         guild = message.guild
@@ -221,8 +223,63 @@ class AutoMod(commands.Cog):
             logger=self.logger,
         )
 
+    async def _periodic_cleanup(self):
+        """
+        Background task that periodically removes stale entries from in-memory tracking.
+
+        - Removes messages older than self._message_age from each user's deque.
+          If a user's deque becomes empty, the user key is removed from the dict.
+        - Removes entries from recently_warned whose expiry timestamp has passed.
+
+        Runs indefinitely until cancelled (cog_unload will cancel the task).
+        """
+        try:
+            while True:
+                await asyncio.sleep(self._cleanup_interval)
+                now = time.time()
+                cutoff = now - self._message_age
+
+                # Clean user_messages: trim old entries and drop empty deques
+                for user_id, dq in list(self.user_messages.items()):
+                    # Remove from the left while entries are older than cutoff
+                    try:
+                        while dq and dq[0][1] < cutoff:
+                            dq.popleft()
+                    except IndexError:
+                        # deque was modified concurrently; ignore and continue
+                        pass
+
+                    if not dq:
+                        # no recent messages, remove the user to bound memory
+                        self.user_messages.pop(user_id, None)
+
+                # Clean recently_warned: remove expired entries
+                for key, expiry in list(self.recently_warned.items()):
+                    if expiry <= now:
+                        self.recently_warned.pop(key, None)
+
+        except asyncio.CancelledError:
+            # Task cancellation during cog unload is expected; just exit cleanly.
+            return
+
+    def cog_unload(self):
+        """
+        Called when the cog is unloaded. Cancel background tasks to stop periodic cleanup
+        and any pending clear_recent_warn tasks, then clear tracked state.
+        """
+        # Cancel background tasks
+        for task in list(self._bg_tasks):
+            task.cancel()
+
+        # Optionally, clear in-memory structures to free memory immediately
+        self.user_messages.clear()
+        self.recently_warned.clear()
+
 
 async def setup(bot):
     await db.init()
-    await bot.add_cog(AutoMod(bot))
+    cog = AutoMod(bot)
+    await bot.add_cog(cog)
+    # start background tasks after the cog is added
+    cog._start_background_tasks()
     logging.getLogger("bot").info("Loaded automod cog.")

@@ -19,13 +19,13 @@ ASSETS_DIR = PROJECT_ROOT / "assets"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-DB_PATH = DATA_DIR / os.environ.get("DB_FILENAME", "automod.db")  # legacy SQLite path
 POSTGRES_CONN_STRING = os.environ.get("POSTGRE_CONN_STRING")  # e.g. postgres://user:pass@host:port/dbname
 USE_POSTGRES = bool(POSTGRES_CONN_STRING)  # switch based on presence of the conn string
 
 LOG_FILE = LOG_DIR / os.environ.get("LOG_FILENAME", "bot.log")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
+# USING ENV VARS FOR BOT CONFIGURATION THESE ARE DEFAULTS IF NOT SET
 PREFIX = os.environ.get("BOT_PREFIX", "k!")
 WELCOME_CHANNEL_NAME = os.environ.get("WELCOME_CHANNEL_NAME", "💬-general")
 
@@ -36,4 +36,4 @@ BAN_AT_WARNINGS = int(os.environ.get("BAN_AT_WARNINGS", "10"))
 TIMEOUT_SECONDS_ON_THRESHOLD = int(os.environ.get("TIMEOUT_SECONDS_ON_THRESHOLD", "60"))
 
 SPAM_TRACK_MESSAGE_COUNT = int(os.environ.get("SPAM_TRACK_MESSAGE_COUNT", "5"))
-SPAM_WINDOW_SECONDS = int(os.environ.get("SPAM_WINDOW_SECONDS", "5"))
+SPAM_WINDOW_SECONDS = int(os.environ.get("SPAM_WINDOW_SECONDS", "3"))

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Optional, Callable, Awaitable
 import asyncpg
 
@@ -12,11 +11,9 @@ class Database:
     Database abstraction using PostgreSQL when POSTGRE_CONN_STRING is provided.
     Falls back to raising if Postgres is not configured (migration target is Postgres).
     """
-    _lock: asyncio.Lock
     _pool: Optional[asyncpg.Pool]
 
     def __init__(self) -> None:
-        self._lock = asyncio.Lock()
         self._pool = None
 
     async def init(self) -> None:
@@ -47,27 +44,26 @@ class Database:
             return await func(conn)
 
     async def increase_warning(self, user_id: int, guild_id: int) -> int:
-        async with self._lock:
-            async def _op(conn: asyncpg.Connection):
-                await conn.execute(
-                    """
-                    INSERT INTO warnings (user_id, guild_id, count)
-                    VALUES ($1, $2, 1)
-                    ON CONFLICT (user_id, guild_id)
-                    DO UPDATE SET count = warnings.count + 1
-                    """,
-                    user_id,
-                    guild_id,
-                )
-                row = await conn.fetchrow(
-                    "SELECT count FROM warnings WHERE user_id=$1 AND guild_id=$2",
-                    user_id,
-                    guild_id,
-                )
-                count = int(row["count"]) if row else 1
-                return min(count, config.MAX_WARNINGS)
+        async def _op(conn: asyncpg.Connection):
+            await conn.execute(
+                """
+                INSERT INTO warnings (user_id, guild_id, count)
+                VALUES ($1, $2, 1)
+                ON CONFLICT (user_id, guild_id)
+                DO UPDATE SET count = warnings.count + 1
+                """,
+                user_id,
+                guild_id,
+            )
+            row = await conn.fetchrow(
+                "SELECT count FROM warnings WHERE user_id=$1 AND guild_id=$2",
+                user_id,
+                guild_id,
+            )
+            count = int(row["count"]) if row else 1
+            return min(count, config.MAX_WARNINGS)
 
-            return await self._with_conn(_op)
+        return await self._with_conn(_op)
 
     async def get_warnings(self, user_id: int, guild_id: int) -> int:
         async def _op(conn: asyncpg.Connection):
