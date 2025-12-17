@@ -24,7 +24,14 @@ Key classes and functions:
 Notes:
 - Commands use both text/hybrid and application command conveniences (autocomplete, choices).
 - This module intentionally does not alter Discord objects beyond the explicit administrative actions; permission errors are handled and reported to the invoking user.
+- The `invites` command includes a safety path for large servers: it warns the caller and requires confirmation
+  before proceeding, and only displays up to a configured maximum number of invites to avoid huge memory/time usage.
 """
+
+# Safety tuning for the invites command
+LARGE_SERVER_MEMBER_THRESHOLD = 1000  # If the guild has more members than this, warn before fetching invites
+INVITES_DISPLAY_LIMIT = 50            # Max number of invites to display/process to avoid large memory use
+INVITES_CONFIRM_TIMEOUT = 20          # Seconds to wait for user confirmation on large servers
 
 color_choices = [
     app_commands.Choice(name="Red", value="#FF0000"),
@@ -197,25 +204,77 @@ class Manager(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     async def invites(self, ctx: commands.Context):
-        """List active server invites and present them as paginated embeds."""
+        """List active server invites and present them as paginated embeds.
+
+        Note: On very large servers this operation can be expensive. For guilds with
+        many members we ask for confirmation before proceeding and only display a
+        limited number of invites to avoid excessive memory/time usage.
+        """
         if ctx.interaction:
             await ctx.defer()
-        invites = await ctx.guild.invites()
+
+        guild = ctx.guild
+        if not guild:
+            return await ctx.send("❌ This command must be used in a server context.")
+
+        # If the server is large, warn the user and require explicit confirmation.
+        member_count = getattr(guild, "member_count", None) or getattr(guild, "approximate_member_count", None)
+        if member_count and member_count >= LARGE_SERVER_MEMBER_THRESHOLD:
+            warning_msg = (
+                f"⚠️ This server has ~{member_count} members. Fetching all invites can be slow and may time out on very large servers.\n"
+                "Type `confirm` in this channel within 20 seconds to proceed, or anything else to cancel."
+            )
+            await ctx.send(warning_msg)
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel
+
+            try:
+                reply = await self.bot.wait_for("message", check=check, timeout=INVITES_CONFIRM_TIMEOUT)
+                if reply.content.strip().lower() != "confirm":
+                    return await ctx.send("Cancelled invites fetch.")
+            except asyncio.TimeoutError:
+                return await ctx.send("No confirmation received; cancelled invites fetch.")
+
+        # Proceed to fetch invites, but be defensive about errors and limit displayed invites.
+        try:
+            invites = await ctx.guild.invites()
+        except discord.Forbidden:
+            return await ctx.send("❌ I don't have permission to view invites in this server.")
+        except Exception as e:
+            return await ctx.send(f"❌ Failed to fetch invites: `{e}`")
+
+        total_invites = len(invites)
+        if total_invites == 0:
+            return await ctx.send("No invites found.")
+
+        # Only display up to INVITES_DISPLAY_LIMIT invites to avoid overwhelming memory/UI.
+        display_invites = invites[:INVITES_DISPLAY_LIMIT]
         embeds = []
 
-        for inv in invites:
+        for inv in display_invites:
             embed = discord.Embed(title="📨 Server Invites", color=discord.Color.red())
-            embed.add_field(name="**👤 Inviter**", value=f"{inv.inviter.mention}\n`{inv.inviter}`", inline=True)
-            embed.add_field(name="**🔗 Invite code**", value=f"`{inv.code}`\n{inv.uses} uses", inline=True)
-            embed.set_thumbnail(url=inv.inviter.display_avatar.url)
+            try:
+                inviter_str = f"{inv.inviter.mention}\n`{inv.inviter}`" if inv.inviter else "Unknown"
+            except Exception:
+                inviter_str = "Unknown"
+            embed.add_field(name="**👤 Inviter**", value=inviter_str, inline=True)
+            embed.add_field(name="**🔗 Invite code**", value=f"`{inv.code}`\n{getattr(inv, 'uses', 'N/A')} uses", inline=True)
+            if getattr(inv, "inviter", None) and getattr(inv.inviter, "display_avatar", None):
+                try:
+                    embed.set_thumbnail(url=inv.inviter.display_avatar.url)
+                except Exception:
+                    pass
             embeds.append(embed)
 
-        if not embeds:
-            await ctx.send("No invites found.")
-            return
+        footer_note = ""
+        if total_invites > INVITES_DISPLAY_LIMIT:
+            footer_note = f"Showing first {INVITES_DISPLAY_LIMIT} of {total_invites} invites. This command may be expensive on large servers."
 
         view = InvitePages(embeds)
-        await ctx.send(embed=embeds[0], view=view)
+        # Send initial embed and optionally include footer note as a follow-up message for clarity.
+        await ctx.send(embed=embeds[0])
+        if footer_note:
+            await ctx.send(footer_note)
 
     @commands.hybrid_command(name="createinvite", help="Manager:Create a new invite link")
     @commands.guild_only()

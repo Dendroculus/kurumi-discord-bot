@@ -6,6 +6,7 @@ import time
 from typing import Optional
 import logging
 from utils import config
+import asyncio
 
 """
 events.py
@@ -234,7 +235,15 @@ class Events(commands.Cog):
             await self._handle_dm(message)
             return
 
-        if profanity.contains_profanity(message.content):
+        # Run the CPU-bound profanity check in a thread to avoid blocking the event loop.
+        try:
+            contains = await asyncio.to_thread(profanity.contains_profanity, message.content)
+        except Exception as e:
+            # If the thread-based check raised unexpectedly, log and skip profanity handling.
+            self.logger.exception("Profanity check failed: %s", e)
+            contains = False
+
+        if contains:
             try:
                 await message.delete()
                 try:
