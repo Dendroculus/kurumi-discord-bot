@@ -5,7 +5,7 @@ import time
 import logging
 from typing import Dict, Tuple
 
-from utils import config
+from utils import configs
 from utils.database import db
 from utils.moderation_utils import enforce_punishments
 
@@ -71,20 +71,20 @@ class AutoMod(commands.Cog):
             bot: The discord.Bot / commands.Bot instance this cog is attached to.
         """
         self.bot = bot
-        self.user_messages: Dict[int, deque] = defaultdict(lambda: deque(maxlen=config.SPAM_TRACK_MESSAGE_COUNT))
+        self.user_messages: Dict[int, deque] = defaultdict(lambda: deque(maxlen=configs.SPAM_TRACK_MESSAGE_COUNT))
         # Map (guild_id, user_id) -> expiry_timestamp
         self.recently_warned: Dict[Tuple[int, int], float] = {}
         self._bg_tasks = set()
         self.logger = logging.getLogger("bot")
 
         # Background task defaults (can be overridden via config)
-        self._cleanup_interval = getattr(config, "AUTOMOD_CLEANUP_INTERVAL_SECONDS", 300)  # every 5 minutes
+        self._cleanup_interval = getattr(configs, "AUTOMOD_CLEANUP_INTERVAL_SECONDS", 300)  # every 5 minutes
         # Age after which tracked messages are considered stale and can be removed.
         # Default to a few times the spam window to be conservative.
         self._message_age = getattr(
-            config,
+            configs,
             "AUTOMOD_MESSAGE_AGE_SECONDS",
-            max(getattr(config, "SPAM_WINDOW_SECONDS", 60) * 4, 300),
+            max(getattr(configs, "SPAM_WINDOW_SECONDS", 60) * 4, 300),
         )
 
     def _track_task(self, coro):
@@ -191,10 +191,10 @@ class AutoMod(commands.Cog):
         Heuristic to determine whether the given user is spamming.
         """
         msgs = self.user_messages[user_id]
-        if len(msgs) < config.SPAM_TRACK_MESSAGE_COUNT:
+        if len(msgs) < configs.SPAM_TRACK_MESSAGE_COUNT:
             return False
 
-        if msgs[-1][1] - msgs[0][1] < config.SPAM_WINDOW_SECONDS:
+        if msgs[-1][1] - msgs[0][1] < configs.SPAM_WINDOW_SECONDS:
             return True
 
         contents = [msg[0] for msg in msgs]
@@ -213,7 +213,7 @@ class AutoMod(commands.Cog):
         guild_id = guild.id
 
         count = await self.on_message_warn(user_id, guild_id)
-        await message.channel.send(f"⚠️ {user.mention}, please stop spamming! Warning `{count}`/{config.MAX_WARNINGS}.")
+        await message.channel.send(f"⚠️ {user.mention}, please stop spamming! Warning `{count}`/{configs.MAX_WARNINGS}.")
 
         await enforce_punishments(
             member=user,

@@ -5,7 +5,7 @@ import io
 import time
 from typing import Optional
 import logging
-from utils import config
+from utils import configs
 import asyncio
 
 """
@@ -76,7 +76,7 @@ class Events(commands.Cog):
         Looks up file names relative to config.ASSETS_DIR. Missing assets are logged
         at WARNING level; unexpected errors during load are logged at ERROR level.
         """
-        base_path = config.ASSETS_DIR
+        base_path = configs.ASSETS_DIR
         files = {
             "welcome": "kurumi1.gif",
             "mention": "kurumi2.gif",
@@ -175,7 +175,7 @@ class Events(commands.Cog):
             await self.bot.change_presence(activity=discord.CustomActivity(name="ara ara konnichiwa"))
         except Exception:
             pass
-        self.logger.info("✅ Logged in as %s", self.bot.user)
+        self.logger.info("Logged in as %s", self.bot.user)
         try:
             synced = await self.bot.tree.sync()
             self.logger.info("Synced %d slash commands.", len(synced))
@@ -191,7 +191,7 @@ class Events(commands.Cog):
         otherwise it falls back to a plain text welcome message. Permission errors are
         silently ignored; other exceptions are logged.
         """
-        channel = discord.utils.get(member.guild.text_channels, name=config.WELCOME_CHANNEL_NAME)
+        channel = discord.utils.get(member.guild.text_channels, name=configs.WELCOME_CHANNEL_NAME)
         if not channel:
             return
 

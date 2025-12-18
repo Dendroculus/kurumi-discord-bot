@@ -3,7 +3,9 @@ from discord.ext import commands
 import time
 import os
 from dotenv import load_dotenv
+from utils.logging_config import setup_logging
 
+logger = setup_logging()
 start_time = time.time()
 warnings = {}
 
@@ -39,6 +41,8 @@ class KurumiBot(commands.AutoShardedBot):
                 print(f"❌ Failed to load extension {ext}: {e}")
     
 if __name__ == '__main__':
+    test_logger = setup_logging()
+    test_logger.info("This is a test log entry to create the file.")
     bot = KurumiBot()
     
     

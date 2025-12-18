@@ -125,4 +125,4 @@ class ErrorHandler(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(ErrorHandler(bot))
-    logger.info("Loaded error handler cog.")
+    logger.info("Loaded errors cog.")

@@ -3,8 +3,9 @@ from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Select
 import aiohttp
-from typing import Any, Dict, List, Optional, Callable, Awaitable
+from typing import Any, Dict, List, Optional, Callable
 import asyncio
+import logging
 
 
 ANILIST_API = "https://graphql.anilist.co"
@@ -566,3 +567,4 @@ class Misc(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Misc(bot))
+    logging.getLogger("bot").info("Loaded miscellaneous cog.")
