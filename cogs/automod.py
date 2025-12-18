@@ -19,8 +19,7 @@ Responsibilities:
 - Warn users who are spamming and escalate punishments via the moderation utilities.
 - Maintain lightweight in-memory tracking structures and background tasks for time-based operations.
 
-New behavior:
-- Adds a periodic background cleanup task (_periodic_cleanup) that runs every
+- A periodic background cleanup task (_periodic_cleanup) that runs every
   few minutes to remove stale entries from in-memory tracking structures so
   they don't grow unbounded.
 - Adds cog_unload to cancel background tasks when the cog is unloaded.
@@ -225,13 +224,15 @@ class AutoMod(commands.Cog):
 
     async def _periodic_cleanup(self):
         """
-        Background task that periodically removes stale entries from in-memory tracking.
+        Periodically remove stale in-memory tracking data.
 
-        - Removes messages older than self._message_age from each user's deque.
-          If a user's deque becomes empty, the user key is removed from the dict.
-        - Removes entries from recently_warned whose expiry timestamp has passed.
+        This background task runs indefinitely until cancelled. On each interval:
+        - Trims old message entries from user message deques.
+        - Removes users whose message deques become empty.
+        - Clears expired entries from the recently_warned map.
 
-        Runs indefinitely until cancelled (cog_unload will cancel the task).
+        Cancellation is expected during cog unload and is re-raised to allow
+        proper task shutdown.
         """
         try:
             while True:
@@ -239,27 +240,52 @@ class AutoMod(commands.Cog):
                 now = time.time()
                 cutoff = now - self._message_age
 
-                # Clean user_messages: trim old entries and drop empty deques
-                for user_id, dq in list(self.user_messages.items()): # noqa: B020
-                    # Remove from the left while entries are older than cutoff
-                    try:
-                        while dq and dq[0][1] < cutoff:
-                            dq.popleft()
-                    except IndexError:
-                        # deque was modified concurrently; ignore and continue
-                        pass
-
-                    if not dq:
-                        # no recent messages, remove the user to bound memory
-                        self.user_messages.pop(user_id, None)
-
-                # Clean recently_warned: remove expired entries
-                for key, expiry in list(self.recently_warned.items()): # noqa: B020
-                    if expiry <= now:
-                        self.recently_warned.pop(key, None)
+                self._cleanup_user_messages(cutoff)
+                self._cleanup_recently_warned(now)
 
         except asyncio.CancelledError:
-            raise # Re-raising ensures the task is marked as cancelled correctly.
+            raise
+
+
+    def _cleanup_user_messages(self, cutoff: float):
+        """
+        Remove outdated message records from per-user deques.
+
+        Messages older than the cutoff timestamp are removed from the left
+        of each deque. If a deque becomes empty, the corresponding user entry
+        is removed to keep memory usage bounded.
+        """
+        for user_id, dq in list(self.user_messages.items()):  # noqa: B020
+            self._trim_deque(dq, cutoff)
+            if not dq:
+                self.user_messages.pop(user_id, None)
+
+
+    def _trim_deque(self, dq, cutoff: float):
+        """
+        Trim old entries from a deque in-place.
+
+        Continuously removes entries from the left while their timestamp is
+        older than the cutoff. Concurrent modifications are safely ignored.
+        """
+        try:
+            while dq and dq[0][1] < cutoff:
+                dq.popleft()
+        except IndexError:
+            pass
+
+
+    def _cleanup_recently_warned(self, now: float):
+        """
+        Remove expired entries from the recently_warned tracking map.
+
+        Any entry whose expiry timestamp is less than or equal to the current
+        time is removed.
+        """
+        for key, expiry in list(self.recently_warned.items()):  # noqa: B020
+            if expiry <= now:
+                self.recently_warned.pop(key, None)
+
 
     def cog_unload(self):
         """
