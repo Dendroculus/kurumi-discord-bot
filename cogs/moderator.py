@@ -6,7 +6,7 @@ from typing import Optional
 import re
 from datetime import timedelta
 import logging
-from utils.config import MAX_WARNINGS
+from utils.configs import MAX_WARNINGS
 from utils.database import db
 from utils.moderation_utils import enforce_punishments
 
@@ -501,3 +501,4 @@ class Moderator(commands.Cog):
         
 async def setup(bot):
     await bot.add_cog(Moderator(bot))
+    logging.getLogger("bot").info("Loaded events cog.")

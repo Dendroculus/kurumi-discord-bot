@@ -1,3 +1,4 @@
+import logging
 import discord
 from discord.ext import commands
 from discord import app_commands, ui, Interaction
@@ -584,3 +585,4 @@ class Manager(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Manager(bot))
+    logging.getLogger("bot").info("Loaded manager cog.")

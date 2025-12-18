@@ -4,7 +4,8 @@ from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button
 import os
-from utils import config
+from utils import configs
+import logging
 
 """
 information.py
@@ -55,7 +56,7 @@ def generate_help_pages(bot_instance):
             category = category.strip().capitalize()
             desc = desc.strip()
             if category in categories:
-                categories[category].append(f"  `{config.PREFIX}{command.name}` — {desc}")
+                categories[category].append(f"  `{configs.PREFIX}{command.name}` — {desc}")
         except ValueError:
             continue
             
@@ -286,7 +287,7 @@ class Information(commands.Cog):
         embed.add_field(name="<:Bot:1416777544870396016> Bot Name", value=self.bot.user.name, inline=True)
         embed.add_field(name="<:ID:1416777985167724687> ID", value=self.bot.user.id, inline=True)
         embed.add_field(name="<:Creator:1416783996440023050> Creator", value="Soumetsu.#8818", inline=True)
-        embed.add_field(name="<:Wrench:1416781024381112513> Prefix", value=f"`{config.PREFIX}`", inline=True)
+        embed.add_field(name="<:Wrench:1416781024381112513> Prefix", value=f"`{configs.PREFIX}`", inline=True)
         embed.add_field(name="<:Globe:1416781731616526356> Servers", value=f"{len(self.bot.guilds)}", inline=True)
         embed.add_field(name="<:Clock:1416782289672732772> Uptime", value=uptime_str, inline=True)
 
@@ -296,3 +297,4 @@ class Information(commands.Cog):
     
 async def setup(bot):
     await bot.add_cog(Information(bot))
+    logging.getLogger("bot").info("Loaded information cog.")

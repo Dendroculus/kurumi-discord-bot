@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from logging.handlers import RotatingFileHandler
 import sys
-from . import config
+from . import configs as config
 
 
 def setup_logging() -> logging.Logger:
