@@ -270,7 +270,6 @@ class Manager(commands.Cog):
         if total_invites > INVITES_DISPLAY_LIMIT:
             footer_note = f"Showing first {INVITES_DISPLAY_LIMIT} of {total_invites} invites. This command may be expensive on large servers."
 
-        view = InvitePages(embeds)
         # Send initial embed and optionally include footer note as a follow-up message for clarity.
         await ctx.send(embed=embeds[0])
         if footer_note:

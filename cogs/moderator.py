@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from discord import app_commands, PermissionOverwrite, Role, Member
+from discord import app_commands, PermissionOverwrite
 from collections import defaultdict
 from typing import Optional
 import re
