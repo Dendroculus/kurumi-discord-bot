@@ -240,7 +240,7 @@ class AutoMod(commands.Cog):
                 cutoff = now - self._message_age
 
                 # Clean user_messages: trim old entries and drop empty deques
-                for user_id, dq in list(self.user_messages.items()):
+                for user_id, dq in list(self.user_messages.items()): # noqa: B020
                     # Remove from the left while entries are older than cutoff
                     try:
                         while dq and dq[0][1] < cutoff:
@@ -254,13 +254,12 @@ class AutoMod(commands.Cog):
                         self.user_messages.pop(user_id, None)
 
                 # Clean recently_warned: remove expired entries
-                for key, expiry in list(self.recently_warned.items()):
+                for key, expiry in list(self.recently_warned.items()): # noqa: B020
                     if expiry <= now:
                         self.recently_warned.pop(key, None)
 
         except asyncio.CancelledError:
-            # Task cancellation during cog unload is expected; just exit cleanly.
-            return
+            raise # Re-raising ensures the task is marked as cancelled correctly.
 
     def cog_unload(self):
         """
@@ -268,7 +267,7 @@ class AutoMod(commands.Cog):
         and any pending clear_recent_warn tasks, then clear tracked state.
         """
         # Cancel background tasks
-        for task in list(self._bg_tasks):
+        for task in list(self._bg_tasks): # noqa: B020
             task.cancel()
 
         # Optionally, clear in-memory structures to free memory immediately
