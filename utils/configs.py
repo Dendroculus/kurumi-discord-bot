@@ -9,6 +9,8 @@ try:
 except Exception:
     pass
 
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT_DIR.parent
 

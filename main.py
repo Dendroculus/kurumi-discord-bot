@@ -1,8 +1,7 @@
 import discord
 from discord.ext import commands
 import time
-import os
-from dotenv import load_dotenv
+from utils.configs import DISCORD_TOKEN
 from utils.logging_config import setup_logging
 
 logger = setup_logging()
@@ -45,8 +44,5 @@ if __name__ == '__main__':
     test_logger.info("This is a test log entry to create the file.")
     bot = KurumiBot()
     
-    
-load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
-bot.run(TOKEN)
+bot.run(DISCORD_TOKEN)
 
