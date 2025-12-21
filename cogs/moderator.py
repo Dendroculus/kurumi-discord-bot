@@ -6,7 +6,7 @@ from typing import Optional
 import re
 from datetime import timedelta
 import logging
-from utils.configs import MAX_WARNINGS
+from constants.configs import MAX_WARNINGS
 from utils.database import db
 from utils.moderation_utils import enforce_punishments
 
