@@ -5,6 +5,7 @@ import io
 import time
 from typing import Optional
 import logging
+import random
 from constants.configs import WELCOME_CHANNEL_NAME, ASSETS_DIR
 import asyncio
 
@@ -59,6 +60,7 @@ class Events(commands.Cog):
         self.dm_cooldown = 3600
         self.global_cooldown = 2
         self.channel_cooldown = 10
+        self.MAX_CACHE_SIZE = 5000
 
         self.mention_cooldowns: dict[int, float] = {}
         self.dm_cooldowns: dict[int, float] = {}
@@ -68,6 +70,29 @@ class Events(commands.Cog):
         self.gifs: dict[str, bytes] = {}
         self.logger = logging.getLogger("bot")
         self._preload_assets()
+        
+    def _purge_dict(self, target_dict: dict, cooldown: float, current_time: float):
+        """Helper to remove expired keys from a specific dictionary."""
+        # Create a list of keys to delete first (safely iterating while modifying)
+        expired = [k for k, v in target_dict.items() if current_time - v > cooldown]
+        for k in expired:
+            del target_dict[k]
+            
+    def _cleanup_expired(self, current_time: float):
+        """Randomly cleans up expired keys to save memory."""
+        self._purge_dict(self.mention_cooldowns, self.mention_cooldown, current_time)
+        self._purge_dict(self.dm_cooldowns, self.dm_cooldown, current_time)
+        self._purge_dict(self.global_cooldowns, self.global_cooldown, current_time)
+        self._purge_dict(self.channel_cooldowns, self.channel_cooldown, current_time)
+
+    def _enforce_max_size(self):
+        """Emergency clear if the bot is being raided."""
+        if len(self.mention_cooldowns) > self.MAX_CACHE_SIZE:
+            self.mention_cooldowns.clear()
+            self.global_cooldowns.clear()
+            self.dm_cooldowns.clear()
+            self.channel_cooldowns.clear()
+            self.logger.warning("Cache hit max size! Forced clear performed.")
 
     def _preload_assets(self) -> None:
         """
@@ -132,6 +157,12 @@ class Events(commands.Cog):
             bool: True if the bot may respond, False otherwise.
         """
         now = self._now()
+        
+        if random.random() < 0.05:
+            self._cleanup_expired(now)
+        
+        if len(self.mention_cooldowns) > self.MAX_CACHE_SIZE:  
+            self._enforce_max_size()
 
         last_global = self.global_cooldowns.get(user_id, 0)
         if now - last_global < self.global_cooldown:
