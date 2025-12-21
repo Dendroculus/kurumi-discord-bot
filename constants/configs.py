@@ -54,3 +54,69 @@ GIF_ASSETS = {
     "Kurumi_3" : "kurumi3.gif",
     "Kurumi_4" : "kurumi4.gif",
 }
+
+ANILIST_API = "https://graphql.anilist.co"
+ANILIST_SEARCH_QUERY = """
+query ($search: String) {
+  Page(perPage: 5) {
+    media(search: $search, type: ANIME) {
+      id
+      title { romaji english native }
+      description(asHtml: false)
+      episodes
+      status
+      duration
+      startDate { year month day }
+      endDate { year month day }
+      season
+      averageScore
+      popularity
+      favourites
+      format
+      source
+      studios(isMain: true) { nodes { name } }
+      genres
+      coverImage { large medium }
+      bannerImage
+      siteUrl
+    }
+  }
+}
+"""
+
+ANILIST_CHARACTER_SEARCH_QUERY = """
+query ($search: String) {
+  Page(perPage: 5) {
+    characters(search: $search) {
+      id
+      name {
+        full
+        native
+      }
+      description
+      image {
+        large
+        medium
+      }
+      gender
+      dateOfBirth {
+        year
+        month
+        day
+      }
+      age
+      bloodType
+      siteUrl
+      favourites
+      media(perPage: 4, sort: POPULARITY_DESC) {
+        nodes {
+          title {
+            romaji
+            english
+          }
+        }
+      }
+    }
+  }
+}
+"""
