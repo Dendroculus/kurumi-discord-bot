@@ -14,11 +14,9 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT_DIR.parent
 
-DATA_DIR = PROJECT_ROOT / "data"
 LOG_DIR = PROJECT_ROOT / "logs"
 ASSETS_DIR = PROJECT_ROOT / "assets"
 
-DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 POSTGRES_CONN_STRING = os.environ.get("POSTGRE_CONN_STRING")  # e.g. postgres://user:pass@host:port/dbname
@@ -31,6 +29,7 @@ LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 PREFIX = os.environ.get("BOT_PREFIX", "k!")
 WELCOME_CHANNEL_NAME = os.environ.get("WELCOME_CHANNEL_NAME", "💬-general")
 
+MAX_TRACKED_USERS = int(os.environ.get("MAX_TRACKED_USERS", "5000"))
 MAX_WARNINGS = int(os.environ.get("MAX_WARNINGS", "10"))
 TIMEOUT_AT_WARNINGS = int(os.environ.get("TIMEOUT_AT_WARNINGS", "3"))
 KICK_AT_WARNINGS = int(os.environ.get("KICK_AT_WARNINGS", "5"))
@@ -39,6 +38,3 @@ TIMEOUT_SECONDS_ON_THRESHOLD = int(os.environ.get("TIMEOUT_SECONDS_ON_THRESHOLD"
 
 SPAM_TRACK_MESSAGE_COUNT = int(os.environ.get("SPAM_TRACK_MESSAGE_COUNT", "5"))
 SPAM_WINDOW_SECONDS = int(os.environ.get("SPAM_WINDOW_SECONDS", "3"))
-
-AUTOMOD_CLEANUP_INTERVAL_SECONDS = int(os.environ.get("AUTOMOD_CLEANUP_INTERVAL_SECONDS", "300"))
-AUTOMOD_MESSAGE_AGE_SECONDS = int(os.environ.get("AUTOMOD_MESSAGE_AGE_SECONDS", str(SPAM_WINDOW_SECONDS * 4)))

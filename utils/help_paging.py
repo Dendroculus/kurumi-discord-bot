@@ -30,7 +30,10 @@ class HelpPages:
         """
         Generate help pages for app commands (slash commands).
         """
-        prefix_names = {cmd.name for cmd in bot_instance.commands} # To avoid duplicates, this ensure only slash-only commands are added
+        prefix_names = [cmd.name for cmd in bot_instance.commands] 
+        """
+        prefix_names : Ensures only slash-only commands are added, since some commands only support slash
+        """
         for command in bot_instance.tree.get_commands():
             if not command.description:
                 continue
