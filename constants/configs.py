@@ -38,3 +38,17 @@ TIMEOUT_SECONDS_ON_THRESHOLD = int(os.environ.get("TIMEOUT_SECONDS_ON_THRESHOLD"
 
 SPAM_TRACK_MESSAGE_COUNT = int(os.environ.get("SPAM_TRACK_MESSAGE_COUNT", "5"))
 SPAM_WINDOW_SECONDS = int(os.environ.get("SPAM_WINDOW_SECONDS", "3"))
+
+GIF_ATTACHMENTS_URL = {
+    "Kurumi_URL" : "attachment://kurumi.gif",
+    "Kurumi_URL_1" : "attachment://kurumi_1.gif",
+    "Kurumi_URL_2" : "attachment://kurumi_2.gif",
+    "Kurumi_URL_3" : "attachment://kurumi_3.gif",
+}
+
+GIF_ASSETS = {
+    "Kurumi" : "kurumi.gif",
+    "Kurumi_1" : "kurumi1.gif",
+    "Kurumi_2" : "kurumi2.gif",
+    "Kurumi_3" : "kurumi3.gif",
+}

@@ -1,6 +1,7 @@
 import discord
 from discord.ui import View, Button
 from constants.configs import PREFIX
+from constants.emojis import KurumiEmojis
 
 class HelpPages:
     """
@@ -66,7 +67,7 @@ class HelpPages:
             if not cmds:
                 continue
             embed = discord.Embed(
-                title=f"<:KurumiLove:1414905093878190180> {category} Commands",
+                title=f"{KurumiEmojis["KurumiLove"]} {category} Commands",
                 color=discord.Color.purple()
             )
             embed.set_thumbnail(url=str(bot_instance.user.display_avatar.url))

@@ -5,7 +5,8 @@ import os
 from discord.ext import commands
 from discord import app_commands
 from utils.help_paging import HelpPages, HelpView
-from constants.configs import PREFIX
+from constants.configs import PREFIX, GIF_ATTACHMENTS_URL, GIF_ASSETS
+from constants.emojis import CustomEmojis
 
 """
 information.py
@@ -61,12 +62,12 @@ class Information(commands.Cog):
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
 
-        embed.add_field(name="<:Crown:1416769782769782824> Owner", value=guild.owner, inline=True)
-        embed.add_field(name="<:Members:1416774798562033745> Members", value=guild.member_count, inline=True)
-        embed.add_field(name="<:Roles:1416773159381766266> Roles", value=len(guild.roles), inline=True)
-        embed.add_field(name="<:TextChannels:1416773166289780746> Text Channels", value=len(guild.text_channels), inline=True)
-        embed.add_field(name="<:VoiceChannels:1416773174116225145> Voice Channels", value=len(guild.voice_channels), inline=True)
-        embed.add_field(name="<:Calendar:1416773567382552596> Created On", value=discord.utils.format_dt(guild.created_at, style='F'), inline=False)
+        embed.add_field(name=f"{CustomEmojis["Crown"]} Owner", value=guild.owner, inline=True)
+        embed.add_field(name=f"{CustomEmojis["Members"]} Members", value=guild.member_count, inline=True)
+        embed.add_field(name=f"{CustomEmojis["Roles"]} Roles", value=len(guild.roles), inline=True)
+        embed.add_field(name=f"{CustomEmojis["TextChannels"]} Text Channels", value=len(guild.text_channels), inline=True)
+        embed.add_field(name=f"{CustomEmojis["VoiceChannels"]} Voice Channels", value=len(guild.voice_channels), inline=True)
+        embed.add_field(name=f"{CustomEmojis["Calendar"]} Created On", value=discord.utils.format_dt(guild.created_at, style='F'), inline=False)
 
         await ctx.send(embed=embed)
 
@@ -156,16 +157,15 @@ class Information(commands.Cog):
             description="Your personal assistant with a yandere twist.",
             color=discord.Color.purple()
         )
-        embed.set_thumbnail(url="attachment://kurumi.gif")  
+        embed.set_thumbnail(url=GIF_ATTACHMENTS_URL["Kurumi_URL"])  
 
-        embed.add_field(name="<:Bot:1416777544870396016> Bot Name", value=self.bot.user.name, inline=True)
-        embed.add_field(name="<:ID:1416777985167724687> ID", value=self.bot.user.id, inline=True)
-        embed.add_field(name="<:Creator:1416783996440023050> Creator", value="Soumetsu.#8818", inline=True)
-        embed.add_field(name="<:Wrench:1416781024381112513> Prefix", value=f"`{PREFIX}`", inline=True)
-        embed.add_field(name="<:Globe:1416781731616526356> Servers", value=f"{len(self.bot.guilds)}", inline=True)
-        embed.add_field(name="<:Clock:1416782289672732772> Uptime", value=uptime_str, inline=True)
-
-        file = discord.File(os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "kurumi.gif"),filename="kurumi.gif")
+        embed.add_field(name=f"{CustomEmojis["Bot"]} Bot Name", value=self.bot.user.name, inline=True)
+        embed.add_field(name=f"{CustomEmojis["ID"]} ID", value=self.bot.user.id, inline=True)
+        embed.add_field(name=f"{CustomEmojis["Creator"]} Creator", value="Soumetsu.#8818", inline=True)
+        embed.add_field(name=f"{CustomEmojis["Wrench"]} Prefix", value=f"`{PREFIX}`", inline=True)
+        embed.add_field(name=f"{CustomEmojis["Globe"]} Servers", value=f"{len(self.bot.guilds)}", inline=True)
+        embed.add_field(name=f"{CustomEmojis["Clock"]} Uptime", value=uptime_str, inline=True)
+        file = discord.File(os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", GIF_ASSETS["Kurumi"]),filename=GIF_ASSETS["Kurumi"])
 
         await ctx.send(file=file, embed=embed)
     
