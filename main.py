@@ -39,7 +39,7 @@ class KurumiBot(commands.AutoShardedBot):
             except Exception as e:
                 print(f"❌ Failed to load extension {ext}: {e}")
     
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_logger = setup_logging()
     test_logger.info("This is a test log entry to create the file.")
     bot = KurumiBot()
