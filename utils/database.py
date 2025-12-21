@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional, Callable, Awaitable
 import asyncpg
 
-from utils import configs
+from constants.configs import MAX_WARNINGS, POSTGRES_CONN_STRING
 
 
 class Database:
@@ -20,10 +20,10 @@ class Database:
         if self._pool:
             return
 
-        if not configs.POSTGRES_CONN_STRING:
+        if not POSTGRES_CONN_STRING:
             raise RuntimeError("POSTGRE_CONN_STRING is not set. Please configure Postgres in your .env.")
 
-        self._pool = await asyncpg.create_pool(dsn=configs.POSTGRES_CONN_STRING, min_size=1, max_size=5)
+        self._pool = await asyncpg.create_pool(dsn=POSTGRES_CONN_STRING, min_size=1, max_size=5)
 
         async with self._pool.acquire() as conn:
             await conn.execute(
@@ -61,7 +61,7 @@ class Database:
                 guild_id,
             )
             count = int(row["count"]) if row else 1
-            return min(count, configs.MAX_WARNINGS)
+            return min(count, MAX_WARNINGS)
 
         return await self._with_conn(_op)
 

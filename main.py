@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 import time
-from utils.configs import DISCORD_TOKEN
+from constants.configs import DISCORD_TOKEN
 from utils.logging_config import setup_logging
 
 logger = setup_logging()

@@ -5,7 +5,7 @@ import io
 import time
 from typing import Optional
 import logging
-from utils import configs
+from constants.configs import WELCOME_CHANNEL_NAME, ASSETS_DIR
 import asyncio
 
 """
@@ -76,7 +76,7 @@ class Events(commands.Cog):
         Looks up file names relative to config.ASSETS_DIR. Missing assets are logged
         at WARNING level; unexpected errors during load are logged at ERROR level.
         """
-        base_path = configs.ASSETS_DIR
+        base_path = ASSETS_DIR
         files = {
             "welcome": "kurumi1.gif",
             "mention": "kurumi2.gif",
@@ -191,7 +191,7 @@ class Events(commands.Cog):
         otherwise it falls back to a plain text welcome message. Permission errors are
         silently ignored; other exceptions are logged.
         """
-        channel = discord.utils.get(member.guild.text_channels, name=configs.WELCOME_CHANNEL_NAME)
+        channel = discord.utils.get(member.guild.text_channels, name=WELCOME_CHANNEL_NAME)
         if not channel:
             return
 

@@ -1,7 +1,7 @@
 import logging
 import discord
 from discord.ext import commands
-from discord import app_commands, ui, Interaction
+from discord import app_commands, ui, Interaction, Attachment
 from datetime import timedelta
 import re
 import asyncio
@@ -18,7 +18,6 @@ Responsibilities:
 - Expose management commands with appropriate permission checks and helpful UX.
 
 Key classes and functions:
-- EmojiCreatorView: interactive flow for uploading and creating a guild emoji.
 - InvitePages: simple paginated view for browsing embeds (used for invites output).
 - Manager: Cog exposing hybrid commands to manage slowmode, invites, roles, nicknames, timeouts, channel names, and role colors.
 
@@ -56,70 +55,6 @@ color_choices = [
     app_commands.Choice(name="Lavender", value="#E6E6FA"),
     app_commands.Choice(name="Navy", value="#000080"),
 ]
-    
-class EmojiCreatorView(ui.View):
-    """
-    Interactive view guiding a user through creating a custom guild emoji.
-
-    Flow:
-    1. User clicks 'Upload Emoji' button.
-    2. The view prompts the user to upload an attachment (PNG/JPG/GIF, <= 256KB).
-    3. The view prompts the user to provide a name for the emoji.
-    4. The bot attempts to create the emoji in the invoking guild and reports success/failure.
-
-    Only the interaction author may use the provided controls; timeouts are enforced by the view (120s).
-    """
-    def __init__(self, author: discord.Member):
-        super().__init__(timeout=120)
-        self.author = author
-
-    @ui.button(label="Upload Emoji", style=discord.ButtonStyle.primary)
-    async def upload_emoji(self, interaction: Interaction, button: ui.Button):
-        """
-        Handle the upload button interaction.
-
-        Security/UX:
-        - Ensures only the original command author can proceed.
-        - Uses wait_for to capture the next message from the same author containing an attachment.
-        - Validates file size (<=256KB) and collects the emoji name before creating.
-        - Reports errors back to the author via ephemeral followups when appropriate.
-        """
-        if interaction.user != self.author:
-            await interaction.response.send_message("Only the command author can use this button.", ephemeral=True)
-            return
-
-        await interaction.response.send_message("Please upload the image for the emoji now (PNG/JPG/GIF, max 256KB).", ephemeral=True)
-
-        def check(m):
-            return m.author == self.author and m.attachments
-        try:
-            msg = await interaction.client.wait_for("message", check=check, timeout=120)
-        except asyncio.TimeoutError:
-            await interaction.followup.send("Timed out waiting for an attachment.", ephemeral=True)
-            return
-
-        attachment = msg.attachments[0]
-        if attachment.size > 256 * 1024:
-            await interaction.followup.send("File is too large. Max 256KB.", ephemeral=True)
-            return
-
-        await interaction.followup.send("Please type the name for your emoji.", ephemeral=True)
-
-        def name_check(m):
-            return m.author == self.author and len(m.content) > 0
-        try:
-            name_msg = await interaction.client.wait_for("message", check=name_check, timeout=60)
-        except asyncio.TimeoutError:
-            await interaction.followup.send("Timed out waiting for emoji name.", ephemeral=True)
-            return
-
-        emoji_name = name_msg.content
-        try:
-            image_bytes = await attachment.read()
-            emoji = await interaction.guild.create_custom_emoji(name=emoji_name, image=image_bytes)
-            await interaction.followup.send(f"Emoji created: <:{emoji.name}:{emoji.id}>")
-        except Exception as e:
-            await interaction.followup.send(f"Failed to create emoji: {e}", ephemeral=True)
 
 class InvitePages(ui.View):
     """
@@ -583,6 +518,41 @@ class Manager(commands.Cog):
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to edit that channel.")
 
+    @app_commands.command(name="createemoji", description="Manager: Create a custom emoji")
+    @app_commands.guild_only()
+    @app_commands.describe(
+        image="Image file for the emoji (PNG/JPG/GIF, max 256KB)",
+    )
+    @app_commands.checks.has_permissions(manage_emojis=True)
+    async def createemoji(
+        self, 
+        interaction: Interaction, 
+        image: Attachment, 
+        name: str,
+        ):
+        """
+        Create a custom emoji from an uploaded image file.
+        """
+        file_extension = [ "jpeg", "png", "gif", "webp", "avif", "jpg"]
+        
+        extension = image.filename.split(".")[-1].lower()
+        if image.size > 256 * 1024:
+            return await interaction.response.send_message("Please upload an image file smaller than 256KB.", ephemeral=True)
+            
+        if extension not in file_extension:
+            return await interaction.response.send_message(f"Unsupported file format. Supported file format : {', '.join(file_extension).upper()} images.", ephemeral=True)
+        
+        await interaction.response.defer()
+        
+        image_bytes = await image.read()
+        try:
+            emoji = await interaction.guild.create_custom_emoji(name=name, image=image_bytes)
+            await interaction.followup.send(f"Created emoji: <:{emoji.name}:{emoji.id}>", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.followup.send("❌ I don't have permission to create emojis in this server.", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Failed to create emoji: `{e}`", ephemeral=True)
+        
 async def setup(bot):
     await bot.add_cog(Manager(bot))
     logging.getLogger("bot").info("Loaded manager cog.")

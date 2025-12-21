@@ -1,11 +1,11 @@
 import discord
 import time
+import logging
+import os
 from discord.ext import commands
 from discord import app_commands
-from discord.ui import View, Button
-import os
-from utils import configs
-import logging
+from utils.help_paging import HelpPages, HelpView
+from constants.configs import PREFIX
 
 """
 information.py
@@ -29,133 +29,7 @@ Integration expectations:
 """
 
 start_time = time.time()
-        
-def generate_help_pages(bot_instance):
-    """
-    Build a list of Embed pages representing categorized command help.
 
-    The function examines commands registered on `bot_instance` and expects the
-    command.help string to be formatted as "Category:Description". Recognized
-    categories are "Information", "Manager", "Moderator" and "Miscellaneous".
-
-    Args:
-        bot_instance: The Bot instance whose commands will be inspected.
-
-    Returns:
-        List[discord.Embed]: Embeds for each non-empty command category ready to be sent.
-    """
-    categories = {"Information": [], "Manager": [], "Moderator": [], "Miscellaneous": []}
-    
-    all_commands = bot_instance.commands
-    
-    for command in all_commands:
-        if command.hidden or not command.help:
-            continue
-        try:
-            category, desc = command.help.split(":", 1)
-            category = category.strip().capitalize()
-            desc = desc.strip()
-            if category in categories:
-                categories[category].append(f"  `{configs.PREFIX}{command.name}` — {desc}")
-        except ValueError:
-            continue
-            
-    pages = []
-    for cat, cmds in categories.items():
-        if not cmds:
-            continue
-        embed = discord.Embed(title=f"<:KurumiLove:1414905093878190180> {cat} Commands", color=discord.Color.purple())
-        embed.set_thumbnail(url=str(bot_instance.user.display_avatar.url))
-        embed.description = "\n".join(cmds)
-        pages.append(embed)
-    return pages
-
-class HelpView(View):
-    """
-    Interactive paginated view for displaying help pages with previous/next/delete controls.
-
-    Usage:
-    - Instantiate with `pages` (list of discord.Embed) and the requesting `author`.
-    - The view enforces that only the original author may use the navigation buttons.
-    - The Delete button removes the message (owner-only).
-    """
-    def __init__(self, pages, author):
-        super().__init__(timeout=None)
-        self.pages = pages
-        self.author = author
-        self.current_page = 0
-        self.message = None
-
-        self.page_btn = Button(
-            label=f"{self.current_page + 1}/{len(self.pages)}",
-            style=discord.ButtonStyle.secondary,
-            disabled=True
-        )
-
-        self.prev_btn = Button(label="<", style=discord.ButtonStyle.danger)
-        self.next_btn = Button(label=">", style=discord.ButtonStyle.danger)
-        self.delete_button = Button(label="Delete", style=discord.ButtonStyle.danger)
-
-        # Assign callbacks to button interactions
-        self.prev_btn.callback = self.prev_button
-        self.next_btn.callback = self.next_button
-        self.delete_button.callback = self.handle_delete
-        
-        self.add_item(self.prev_btn)
-        self.add_item(self.page_btn)
-        self.add_item(self.next_btn)
-        self.add_item(self.delete_button)
-
-        self._update_buttons()
-
-    def _update_buttons(self):
-        """Enable/disable navigation buttons and update the page indicator label."""
-        self.prev_btn.disabled = self.current_page == 0
-        self.next_btn.disabled = self.current_page == len(self.pages) - 1
-        self.page_btn.label = f"{self.current_page + 1}/{len(self.pages)}"
-
-    async def on_timeout(self):
-        """Disable all child controls when the view times out and edit the message to apply the change."""
-        for item in self.children:
-            item.disabled = True
-        if self.message:
-            await self.message.edit(view=self)
-
-    async def prev_button(self, interaction: discord.Interaction):
-        """
-        Navigate to the previous page.
-
-        Only the original author may operate the controls.
-        """
-        if interaction.user.id != self.author.id:
-            return await interaction.response.send_message("❌ You can't use these buttons.", ephemeral=True)
-        self.current_page -= 1
-        self._update_buttons()
-        await interaction.response.edit_message(embed=self.pages[self.current_page], view=self)
-
-    async def next_button(self, interaction: discord.Interaction):
-        """
-        Navigate to the next page.
-
-        Only the original author may operate the controls.
-        """
-        if interaction.user.id != self.author.id:
-            return await interaction.response.send_message("❌ You can't use these buttons.", ephemeral=True)
-        self.current_page += 1
-        self._update_buttons()
-        await interaction.response.edit_message(embed=self.pages[self.current_page], view=self)
-        
-    async def handle_delete(self, interaction: discord.Interaction):
-        """
-        Delete the message containing the help view.
-
-        Only the original author may delete the message. The interaction is deferred
-        before performing the deletion to provide a responsive UX.
-        """
-        if interaction.user.id != self.author.id:
-            return await interaction.response.send_message("❌ You can't delete this message.", ephemeral=True)
-        await interaction.response.defer()
-        await interaction.message.delete()
         
 class Information(commands.Cog):
     """
@@ -242,7 +116,7 @@ class Information(commands.Cog):
         If a category is provided and found, a single page is sent. Otherwise an
         interactive HelpView is created to allow the user to navigate pages.
         """
-        pages = generate_help_pages(self.bot)
+        pages = HelpPages.generate_help_pages(self.bot)
         if not pages:
             return await ctx.send("No commands available to show.")
 
@@ -287,7 +161,7 @@ class Information(commands.Cog):
         embed.add_field(name="<:Bot:1416777544870396016> Bot Name", value=self.bot.user.name, inline=True)
         embed.add_field(name="<:ID:1416777985167724687> ID", value=self.bot.user.id, inline=True)
         embed.add_field(name="<:Creator:1416783996440023050> Creator", value="Soumetsu.#8818", inline=True)
-        embed.add_field(name="<:Wrench:1416781024381112513> Prefix", value=f"`{configs.PREFIX}`", inline=True)
+        embed.add_field(name="<:Wrench:1416781024381112513> Prefix", value=f"`{PREFIX}`", inline=True)
         embed.add_field(name="<:Globe:1416781731616526356> Servers", value=f"{len(self.bot.guilds)}", inline=True)
         embed.add_field(name="<:Clock:1416782289672732772> Uptime", value=uptime_str, inline=True)
 

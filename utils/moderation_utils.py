@@ -4,8 +4,7 @@ from datetime import timedelta
 from typing import Optional
 import logging
 import discord
-from utils import configs
-
+from constants.configs import BAN_AT_WARNINGS, KICK_AT_WARNINGS, TIMEOUT_AT_WARNINGS, TIMEOUT_SECONDS_ON_THRESHOLD
 
 def _is_currently_timed_out(member: discord.Member) -> bool:
     until = getattr(member, "timed_out_until", None)
@@ -24,25 +23,25 @@ async def enforce_punishments(
     logger = logger or logging.getLogger("bot")
 
     try:
-        if count >= configs.BAN_AT_WARNINGS:
-            await member.guild.ban(member, reason=f"Too many warnings ({configs.BAN_AT_WARNINGS})")
+        if count >= BAN_AT_WARNINGS:
+            await member.guild.ban(member, reason=f"Too many warnings ({BAN_AT_WARNINGS})")
             if channel:
-                await channel.send(f"⛔ {member.mention} has been banned for reaching {configs.BAN_AT_WARNINGS} warnings.")
+                await channel.send(f"⛔ {member.mention} has been banned for reaching {BAN_AT_WARNINGS} warnings.")
             return "ban"
 
-        if count == configs.KICK_AT_WARNINGS:
-            await member.guild.kick(member, reason=f"Too many warnings ({configs.KICK_AT_WARNINGS})")
+        if count == KICK_AT_WARNINGS:
+            await member.guild.kick(member, reason=f"Too many warnings ({KICK_AT_WARNINGS})")
             if channel:
-                await channel.send(f"👢 {member.mention} has been kicked for reaching {configs.KICK_AT_WARNINGS} warnings.")
+                await channel.send(f"👢 {member.mention} has been kicked for reaching {KICK_AT_WARNINGS} warnings.")
             return "kick"
 
-        if count >= configs.TIMEOUT_AT_WARNINGS and not _is_currently_timed_out(member):
-            until = discord.utils.utcnow() + timedelta(seconds=configs.TIMEOUT_SECONDS_ON_THRESHOLD)
+        if count >= TIMEOUT_AT_WARNINGS and not _is_currently_timed_out(member):
+            until = discord.utils.utcnow() + timedelta(seconds=TIMEOUT_SECONDS_ON_THRESHOLD)
             await member.edit(timed_out_until=until, reason="Auto timeout due to warnings")
             if channel:
                 await channel.send(
                     f"🔇 {member.mention} has been temporarily muted "
-                    f"({configs.TIMEOUT_SECONDS_ON_THRESHOLD}s) due to repeated warnings."
+                    f"({TIMEOUT_SECONDS_ON_THRESHOLD}s) due to repeated warnings."
                 )
             return "timeout"
 
