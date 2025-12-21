@@ -6,7 +6,7 @@ import time
 from typing import Optional
 import logging
 import random
-from constants.configs import WELCOME_CHANNEL_NAME, ASSETS_DIR
+from constants.configs import WELCOME_CHANNEL_NAME, ASSETS_DIR, GIF_ATTACHMENTS_URL, GIF_ASSETS
 import asyncio
 
 """
@@ -103,9 +103,9 @@ class Events(commands.Cog):
         """
         base_path = ASSETS_DIR
         files = {
-            "welcome": "kurumi1.gif",
-            "mention": "kurumi2.gif",
-            "dm": "kurumi3.gif",
+            "welcome": GIF_ASSETS["Kurumi_1"],
+            "mention": GIF_ASSETS["Kurumi_2"],
+            "dm": GIF_ASSETS["Kurumi_3"],
         }
         for key, fname in files.items():
             path = base_path / fname
@@ -230,7 +230,7 @@ class Events(commands.Cog):
         if gif:
             file = self._file_from_bytes("kurumi1.gif", gif)
             embed = discord.Embed(title="💖 Welcome!", description=f"Welcome to the server, {member.mention}!", color=discord.Color.purple())
-            embed.set_image(url="attachment://kurumi1.gif")
+            embed.set_image(url=GIF_ATTACHMENTS_URL["Kurumi_URL_1"])
             try:
                 await channel.send(file=file, embed=embed)
             except discord.Forbidden:
@@ -316,7 +316,7 @@ class Events(commands.Cog):
 
         if gif:
             file = self._file_from_bytes("kurumi3.gif", gif)
-            embed.set_image(url="attachment://kurumi3.gif")
+            embed.set_image(url=GIF_ATTACHMENTS_URL["Kurumi_URL_3"])
             try:
                 await message.author.send(embed=embed, file=file)
             except discord.Forbidden:
@@ -344,7 +344,7 @@ class Events(commands.Cog):
 
         if gif:
             file = self._file_from_bytes("kurumi2.gif", gif)
-            embed.set_image(url="attachment://kurumi2.gif")
+            embed.set_image(url=GIF_ATTACHMENTS_URL["Kurumi_URL_2"])
             try:
                 await message.channel.send(embed=embed, file=file)
             except discord.Forbidden:
