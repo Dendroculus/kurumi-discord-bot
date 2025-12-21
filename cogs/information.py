@@ -46,6 +46,15 @@ class Information(commands.Cog):
     """
     def __init__(self, bot):
         self.bot = bot
+        
+    @staticmethod
+    def add_embed_fields(embed, fields: list[tuple[str, any, bool]]):
+        """
+        A helper function to add multiple fields to a discord.Embed.
+        fields: list of tuples (emoji_key, label, value, inline)
+        """
+        for emoji_key, label, value, inline in fields:
+            embed.add_field(name=f"{CustomEmojis[emoji_key]} {label}", value=value, inline=inline)
 
     @commands.hybrid_command(name="membercount", help="Information:Shows total member count in the server")
     @commands.guild_only()
@@ -62,17 +71,17 @@ class Information(commands.Cog):
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
 
-        embed.add_field(name=f"{CustomEmojis["Crown"]} Owner", value=guild.owner, inline=True)
-        embed.add_field(name=f"{CustomEmojis["Members"]} Members", value=guild.member_count, inline=True)
-        embed.add_field(name=f"{CustomEmojis["Roles"]} Roles", value=len(guild.roles), inline=True)
-        embed.add_field(name=f"{CustomEmojis["TextChannels"]} Text Channels", value=len(guild.text_channels), inline=True)
-        embed.add_field(name=f"{CustomEmojis["VoiceChannels"]} Voice Channels", value=len(guild.voice_channels), inline=True)
-        embed.add_field(name=f"{CustomEmojis["Calendar"]} Created On", value=discord.utils.format_dt(guild.created_at, style='F'), inline=False)
+        fields = [
+            ("Crown", "Owner", guild.owner, True),
+            ("Members", "Members", guild.member_count, True),
+            ("Roles", "Roles", len(guild.roles), True),
+            ("TextChannels", "Text Channels", len(guild.text_channels), True),
+            ("VoiceChannels", "Voice Channels", len(guild.voice_channels), True),
+            ("Calendar", "Created On", discord.utils.format_dt(guild.created_at, style='F'), False),
+        ]
+        self.add_embed_fields(embed=embed, fields=fields)
 
         await ctx.send(embed=embed)
-        
-        # NOTE : DRY (DON'T REPEAT YOURSELF)
-
         
     @commands.hybrid_command(name="member", help="Information:List members in a role (max 90)")
     @commands.guild_only()
@@ -161,13 +170,15 @@ class Information(commands.Cog):
         )
         embed.set_thumbnail(url=GIF_ATTACHMENTS_URL["Kurumi_URL"])  
 
-        embed.add_field(name=f"{CustomEmojis["Bot"]} Bot Name", value=self.bot.user.name, inline=True)
-        embed.add_field(name=f"{CustomEmojis["ID"]} ID", value=self.bot.user.id, inline=True)
-        embed.add_field(name=f"{CustomEmojis["Creator"]} Creator", value="Soumetsu.#8818", inline=True)
-        embed.add_field(name=f"{CustomEmojis["Wrench"]} Prefix", value=f"`{PREFIX}`", inline=True)
-        embed.add_field(name=f"{CustomEmojis["Globe"]} Servers", value=f"{len(self.bot.guilds)}", inline=True)
-        embed.add_field(name=f"{CustomEmojis["Clock"]} Uptime", value=uptime_str, inline=True)
-        # NOTE : DRY (DON'T REPEAT YOURSELF)
+        fields = [
+            ("Bot", "Bot Name", self.bot.user.name, True),
+            ("ID", "ID", self.bot.user.id, True),
+            ("Creator", "Creator", "Soumetsu.#8818", True),
+            ("Wrench", "Prefix", f"`{PREFIX}`", True),
+            ("Globe", "Servers", f"{len(self.bot.guilds)}", True),
+            ("Clock", "Uptime", uptime_str, True),
+        ]
+        self.add_embed_fields(embed=embed, fields=fields)
 
         events_cog = self.bot.get_cog("Events")
         
