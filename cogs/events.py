@@ -103,6 +103,7 @@ class Events(commands.Cog):
         """
         base_path = ASSETS_DIR
         files = {
+            "info": GIF_ASSETS["Kurumi"],
             "welcome": GIF_ASSETS["Kurumi_1"],
             "mention": GIF_ASSETS["Kurumi_2"],
             "dm": GIF_ASSETS["Kurumi_3"],
@@ -228,7 +229,7 @@ class Events(commands.Cog):
 
         gif = self.gifs.get("welcome")
         if gif:
-            file = self._file_from_bytes("kurumi1.gif", gif)
+            file = self._file_from_bytes(GIF_ASSETS["Kurumi_1"], gif)
             embed = discord.Embed(title="💖 Welcome!", description=f"Welcome to the server, {member.mention}!", color=discord.Color.purple())
             embed.set_image(url=GIF_ATTACHMENTS_URL["Kurumi_URL_1"])
             try:
@@ -315,7 +316,7 @@ class Events(commands.Cog):
         )
 
         if gif:
-            file = self._file_from_bytes("kurumi3.gif", gif)
+            file = self._file_from_bytes(GIF_ASSETS["Kurumi_3"], gif)
             embed.set_image(url=GIF_ATTACHMENTS_URL["Kurumi_URL_3"])
             try:
                 await message.author.send(embed=embed, file=file)
@@ -343,7 +344,7 @@ class Events(commands.Cog):
         embed = discord.Embed(description="Hello there, how can I help you today Master? ✨", color=discord.Color.purple())
 
         if gif:
-            file = self._file_from_bytes("kurumi2.gif", gif)
+            file = self._file_from_bytes(GIF_ASSETS["Kurumi_2"], gif)
             embed.set_image(url=GIF_ATTACHMENTS_URL["Kurumi_URL_2"])
             try:
                 await message.channel.send(embed=embed, file=file)

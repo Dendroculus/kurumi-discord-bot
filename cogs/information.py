@@ -1,7 +1,7 @@
 import discord
 import time
 import logging
-import os
+import io
 from discord.ext import commands
 from discord import app_commands
 from utils.help_paging import HelpPages, HelpView
@@ -70,6 +70,8 @@ class Information(commands.Cog):
         embed.add_field(name=f"{CustomEmojis["Calendar"]} Created On", value=discord.utils.format_dt(guild.created_at, style='F'), inline=False)
 
         await ctx.send(embed=embed)
+        
+        # NOTE : DRY (DON'T REPEAT YOURSELF)
 
         
     @commands.hybrid_command(name="member", help="Information:List members in a role (max 90)")
@@ -165,9 +167,17 @@ class Information(commands.Cog):
         embed.add_field(name=f"{CustomEmojis["Wrench"]} Prefix", value=f"`{PREFIX}`", inline=True)
         embed.add_field(name=f"{CustomEmojis["Globe"]} Servers", value=f"{len(self.bot.guilds)}", inline=True)
         embed.add_field(name=f"{CustomEmojis["Clock"]} Uptime", value=uptime_str, inline=True)
-        file = discord.File(os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", GIF_ASSETS["Kurumi"]),filename=GIF_ASSETS["Kurumi"])
+        # NOTE : DRY (DON'T REPEAT YOURSELF)
 
-        await ctx.send(file=file, embed=embed)
+        events_cog = self.bot.get_cog("Events")
+        
+        if events_cog and "info" in events_cog.gifs :
+            gif_bytes = events_cog.gifs["info"]
+            file = discord.File(io.BytesIO(gif_bytes), filename=GIF_ASSETS["Kurumi"])
+            await ctx.send(file=file, embed=embed)
+        else:
+            await ctx.send(embed=embed) # fallback 
+    
     
 async def setup(bot):
     await bot.add_cog(Information(bot))
