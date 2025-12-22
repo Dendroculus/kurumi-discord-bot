@@ -1,3 +1,6 @@
+"""
+This module contains helper classes and functions to generate and manage paginated help views for the bot's commands.
+"""
 import discord
 from discord.ui import View, Button
 from constants.configs import PREFIX

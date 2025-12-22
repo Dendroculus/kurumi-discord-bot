@@ -6,6 +6,8 @@ from datetime import timedelta
 import re
 import asyncio
 from typing import Optional
+from constants.configs import LARGE_SERVER_MEMBER_THRESHOLD, INVITES_CONFIRM_TIMEOUT, INVITES_DISPLAY_LIMIT
+from utils.colorchoises import color_choices
 
 """
 manager.py
@@ -28,33 +30,6 @@ Notes:
   before proceeding, and only displays up to a configured maximum number of invites to avoid huge memory/time usage.
 """
 
-# Safety tuning for the invites command
-LARGE_SERVER_MEMBER_THRESHOLD = 1000  # If the guild has more members than this, warn before fetching invites
-INVITES_DISPLAY_LIMIT = 50            # Max number of invites to display/process to avoid large memory use
-INVITES_CONFIRM_TIMEOUT = 20          # Seconds to wait for user confirmation on large servers
-
-color_choices = [
-    app_commands.Choice(name="Red", value="#FF0000"),
-    app_commands.Choice(name="Green", value="#00FF00"),
-    app_commands.Choice(name="Blue", value="#0000FF"),
-    app_commands.Choice(name="Yellow", value="#FFFF00"),
-    app_commands.Choice(name="Purple", value="#800080"),
-    app_commands.Choice(name="Orange", value="#FFA500"),
-    app_commands.Choice(name="Pink", value="#FFC0CB"),
-    app_commands.Choice(name="Cyan", value="#00FFFF"),
-    app_commands.Choice(name="White", value="#FFFFFF"),
-    app_commands.Choice(name="Black", value="#000000"),
-    app_commands.Choice(name="Teal", value="#008080"),
-    app_commands.Choice(name="Lime", value="#32CD32"),
-    app_commands.Choice(name="Magenta", value="#FF00FF"),
-    app_commands.Choice(name="Indigo", value="#4B0082"),
-    app_commands.Choice(name="Turquoise", value="#40E0D0"),
-    app_commands.Choice(name="Gold", value="#FFD700"),
-    app_commands.Choice(name="Silver", value="#C0C0C0"),
-    app_commands.Choice(name="Brown", value="#8B4513"),
-    app_commands.Choice(name="Lavender", value="#E6E6FA"),
-    app_commands.Choice(name="Navy", value="#000080"),
-]
 
 class InvitePages(ui.View):
     """
@@ -92,19 +67,6 @@ class InvitePages(ui.View):
         self.index = (self.index + 1) % len(self.embeds)
         self.page_btn.label = f"{self.index + 1}/{len(self.embeds)}"
         await interaction.response.edit_message(embed=self.embeds[self.index], view=self)
-        
-color_choices = [
-    app_commands.Choice(name="🔴 Red", value="#ff0000"),
-    app_commands.Choice(name="🟢 Green", value="#00ff00"),
-    app_commands.Choice(name="🔵 Blue", value="#0000ff"),
-    app_commands.Choice(name="🟣 Purple", value="#800080"),
-    app_commands.Choice(name="🟡 Yellow", value="#ffff00"),
-    app_commands.Choice(name="⚫ Black", value="#000000"),
-    app_commands.Choice(name="⚪ White", value="#ffffff"),
-    app_commands.Choice(name="🩷 Pink", value="#ff69b4"),
-    app_commands.Choice(name="🟤 Brown", value="#8b4513"),
-    app_commands.Choice(name="🧡 Orange", value="#ffa500"),
-]
 
 class Manager(commands.Cog):
     """
@@ -373,7 +335,7 @@ class Manager(commands.Cog):
             try:
                 colour = discord.Color(int(color.value.lstrip("#"), 16)) if color else discord.Color.default()
                 role = await guild.create_role(name=role_name, colour=colour)
-                await ctx.send(f"🎉 Role `{role_name}` created{' with ' + color.name if color else ''}.")
+                await ctx.send(f"Role `{role_name}` created{' with ' + color.name if color else ''} color.")
             except discord.Forbidden:
                 return await ctx.send("❌ I don't have permission to create roles.", ephemeral=True)
             except Exception as e:

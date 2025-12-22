@@ -1,3 +1,6 @@
+"""
+This module sets up logging for the Discord bot, configuring both file and console handlers with appropriate formatting and log levels.
+"""
 from __future__ import annotations
 
 import logging

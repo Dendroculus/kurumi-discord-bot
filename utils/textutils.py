@@ -1,3 +1,6 @@
+"""
+This module contains utility helpers for text processing and a generic select view for Discord bots.
+"""
 import discord
 from typing import Any, Dict, List, Optional, Callable
 from discord.ui import View, Select

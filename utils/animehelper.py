@@ -1,6 +1,10 @@
+"""
+This module provides utility functions to create Discord embeds and selection options
+for displaying anime and character information fetched from the AniList API.
+"""
 import discord
 from typing import Any, Dict, List, Callable, Optional
-from utils.textutils import TextUtils
+from utils.textUtils import TextUtils
 from discord.ui import View, Select
 
 def build_character_embed(cd: Dict[str, Any]) -> discord.Embed:
