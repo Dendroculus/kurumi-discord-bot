@@ -51,11 +51,26 @@ class Misc(commands.Cog):
         if not self.session.closed:
             self._session_close_task = asyncio.create_task(self.session.close())
             
-    @staticmethod
-    def fetch_animals(api_url: str, session: aiohttp.ClientSession) -> Optional[str]:
-        """Fetch a random animal image URL from the specified API endpoint."""
-        # This method is not used in the current implementation but could be utilized for code reuse.
-        pass # TODO: RN CATS DOGS RABBITS ALL USES SIMILAR LOGIC, THIS COULD BE USED.
+    async def fetch_animal(self, ctx: commands.Context, api_url: str, animal_type: str, title: str, color: discord.Color, json_response_key: str):
+        """Helper function to fetch a random animal image."""
+        await self._defer_if_slash(ctx)
+
+        try:
+            async with self.session.get(api_url) as resp:
+                if resp.status != 200:
+                    return await ctx.send(f"❌ Couldn't fetch a {animal_type} right now.")
+                data = await resp.json()
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            return await ctx.send(f"❌ An error occurred while fetching a {animal_type}.")
+        
+        if isinstance(data, list): # CHECK: some APIs return a list at the top level or not
+            image_url = data[0][json_response_key]
+        else:
+            image_url = data[json_response_key]
+
+        embed = discord.Embed(title=title, color=color)
+        embed.set_image(url=image_url)
+        await ctx.send(embed=embed)
 
     @staticmethod
     async def _defer_if_slash(ctx: commands.Context) -> None:
@@ -88,54 +103,39 @@ class Misc(commands.Cog):
 
     @commands.hybrid_command(name="cats", help="Miscellaneous: Shows a random cat image")
     async def cats(self, ctx: commands.Context):
-        """Fetch a random cat image from a public API and send it in an embed."""
-        await self._defer_if_slash(ctx)
-
-        try:
-            async with self.session.get("https://api.thecatapi.com/v1/images/search") as resp:
-                if resp.status != 200:
-                    return await ctx.send("😿 Couldn't fetch a cat right now.")
-                data = await resp.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError):
-            return await ctx.send("😿 An error occurred while fetching a cat.")
-
-        embed = discord.Embed(title="🐱 Meow!", color=discord.Color.purple())
-        embed.set_image(url=data[0]["url"])
-        await ctx.send(embed=embed)
+        """Fetch a random cat image and send it as an embed."""
+        await self.fetch_animal(
+            ctx,
+            api_url="https://api.thecatapi.com/v1/images/search",
+            animal_type="cat",
+            title="🐱 Meow!",
+            color=discord.Color.purple(),
+            json_response_key="url"
+        )
 
     @commands.hybrid_command(name="dogs", help="Miscellaneous: Get a random dog image")
     async def dogs(self, ctx: commands.Context):
         """Fetch a random dog image and send it as an embed."""
-        await self._defer_if_slash(ctx)
-
-        try:
-            async with self.session.get("https://dog.ceo/api/breeds/image/random") as resp:
-                if resp.status != 200:
-                    return await ctx.send("❌ Couldn't fetch a dog right now.")
-                data = await resp.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError):
-            return await ctx.send("❌ An error occurred while fetching a dog.")
-
-        embed = discord.Embed(title="🐶 Woof!", color=discord.Color.purple())
-        embed.set_image(url=data["message"])
-        await ctx.send(embed=embed)
+        await self.fetch_animal(
+            ctx,
+            api_url="https://dog.ceo/api/breeds/image/random",
+            animal_type="dog",
+            title="🐶 Woof!",
+            color=discord.Color.purple(),
+            json_response_key="message"
+        )
 
     @commands.hybrid_command(name="rabbits", help="Miscellaneous: Get a random rabbit image")
     async def rabbits(self, ctx: commands.Context):
         """Fetch a random rabbit image and send it as an embed."""
-        await self._defer_if_slash(ctx)
-
-        try:
-            async with self.session.get("https://rabbit-api-two.vercel.app/api/random") as resp:
-                if resp.status != 200:
-                    return await ctx.send("❌ Couldn't fetch a rabbit right now.")
-                data = await resp.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError):
-            return await ctx.send("❌ An error occurred while fetching a rabbit.")
-
-        embed = discord.Embed(title="🐰 Cluck!", color=discord.Color.purple())
-        embed.set_image(url=data["url"])
-        await ctx.send(embed=embed)
+        await self.fetch_animal(
+            ctx,
+            api_url="https://rabbit-api-two.vercel.app/api/random",
+            animal_type="rabbit",
+            title="🐰 Cluck!",
+            color=discord.Color.purple(),
+            json_response_key="url"
+        )
 
     @commands.hybrid_command(name="anime", help="Miscellaneous: Search for an anime by name (AniList)")
     async def anime(self, ctx: commands.Context, *, query: str):
