@@ -1,5 +1,8 @@
+"""
+This module provides utility functions for enforcing automatic punishments
+based on the number of warnings a Discord member has received.
+"""
 from __future__ import annotations
-
 from datetime import timedelta
 from typing import Optional
 import logging

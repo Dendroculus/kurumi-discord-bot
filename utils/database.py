@@ -1,10 +1,12 @@
-from __future__ import annotations
+""" 
+This module provides a Database class that abstracts PostgreSQL operations for managing user warnings in a Discord bot.
+It initializes the database connection, creates necessary tables, and provides methods to increase, get, and reset warnings for users.
+"""
 
+from __future__ import annotations
 from typing import Optional, Callable, Awaitable
 import asyncpg
-
 from constants.configs import MAX_WARNINGS, POSTGRES_CONN_STRING
-
 
 class Database:
     """

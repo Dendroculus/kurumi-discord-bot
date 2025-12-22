@@ -55,6 +55,7 @@ GIF_ASSETS = {
     "Kurumi_4" : "kurumi4.gif",
 }
 
+NO_REASON = "No reason provided"
 ANILIST_API = "https://graphql.anilist.co"
 ANILIST_SEARCH_QUERY = """
 query ($search: String) {
@@ -120,3 +121,8 @@ query ($search: String) {
   }
 }
 """
+
+# Safety tuning for the invites command
+LARGE_SERVER_MEMBER_THRESHOLD = 1000  # If the guild has more members than this, warn before fetching invites
+INVITES_DISPLAY_LIMIT = 50            # Max number of invites to display/process to avoid large memory use
+INVITES_CONFIRM_TIMEOUT = 20          # Seconds to wait for user confirmation on large servers
