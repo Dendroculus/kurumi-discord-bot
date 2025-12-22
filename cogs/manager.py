@@ -1,13 +1,13 @@
 import logging
 import discord
 from discord.ext import commands
-from discord import app_commands, ui, Interaction, Attachment
+from discord import app_commands, Interaction, Attachment
 from datetime import timedelta
 import re
-import asyncio
 from typing import Optional
-from constants.configs import LARGE_SERVER_MEMBER_THRESHOLD, INVITES_CONFIRM_TIMEOUT, INVITES_DISPLAY_LIMIT
 from utils.colorchoises import color_choices
+from utils.invitepages import InvitePages
+from constants.configs import LARGE_SERVER_MEMBER_THRESHOLD, INVITES_CONFIRM_TIMEOUT, INVITES_DISPLAY_LIMIT
 
 """
 manager.py
@@ -29,44 +29,6 @@ Notes:
 - The `invites` command includes a safety path for large servers: it warns the caller and requires confirmation
   before proceeding, and only displays up to a configured maximum number of invites to avoid huge memory/time usage.
 """
-
-
-class InvitePages(ui.View):
-    """
-    Simple paginated view for a list of embeds.
-
-    Usage:
-    - Initialize with a list of embeds.
-    - Presents previous/next buttons to cycle through pages (wrap-around behavior).
-    - Shows a page indicator button (disabled).
-    """
-    def __init__(self, embeds):
-        super().__init__(timeout=None)
-        self.embeds = embeds
-        self.index = 0
-
-        self.page_btn = ui.Button(label=f"{self.index + 1}/{len(self.embeds)}", style=discord.ButtonStyle.secondary, disabled=True)
-        self.prev_btn = ui.Button(label="◀", style=discord.ButtonStyle.danger)
-        self.next_btn = ui.Button(label="▶", style=discord.ButtonStyle.danger)
-
-        self.prev_btn.callback = self.go_prev
-        self.next_btn.callback = self.go_next
-
-        self.add_item(self.prev_btn)
-        self.add_item(self.page_btn)
-        self.add_item(self.next_btn)
-
-    async def go_prev(self, interaction: Interaction):
-        """Go to the previous embed page (wraps to the end)."""
-        self.index = (self.index - 1) % len(self.embeds)
-        self.page_btn.label = f"{self.index + 1}/{len(self.embeds)}"
-        await interaction.response.edit_message(embed=self.embeds[self.index], view=self)
-
-    async def go_next(self, interaction: Interaction):
-        """Go to the next embed page (wraps to the start)."""
-        self.index = (self.index + 1) % len(self.embeds)
-        self.page_btn.label = f"{self.index + 1}/{len(self.embeds)}"
-        await interaction.response.edit_message(embed=self.embeds[self.index], view=self)
 
 class Manager(commands.Cog):
     """
@@ -98,80 +60,86 @@ class Manager(commands.Cog):
         await target_channel.edit(slowmode_delay=seconds)
         await ctx.send(f"🐢 Slowmode in {target_channel.mention} set to **{seconds}**s.")
 
-    @commands.hybrid_command(name="invites", help="Manager:View all active server invites")
+    @commands.hybrid_command(name="invites", help="Manager: View all active server invites")
     @commands.guild_only()
     @commands.has_permissions(administrator=True)
     async def invites(self, ctx: commands.Context):
-        """List active server invites and present them as paginated embeds.
-
-        Note: On very large servers this operation can be expensive. For guilds with
-        many members we ask for confirmation before proceeding and only display a
-        limited number of invites to avoid excessive memory/time usage.
-        """
-        if ctx.interaction:
-            await ctx.defer()
-
-        guild = ctx.guild
-        if not guild:
-            return await ctx.send("❌ This command must be used in a server context.")
-
-        # If the server is large, warn the user and require explicit confirmation.
-        member_count = getattr(guild, "member_count", None) or getattr(guild, "approximate_member_count", None)
-        if member_count and member_count >= LARGE_SERVER_MEMBER_THRESHOLD:
-            warning_msg = (
-                f"⚠️ This server has ~{member_count} members. Fetching all invites can be slow and may time out on very large servers.\n"
-                "Type `confirm` in this channel within 20 seconds to proceed, or anything else to cancel."
+        """List active server invites in a compact table view (Safe for large servers)."""
+        
+        if ctx.guild.member_count > LARGE_SERVER_MEMBER_THRESHOLD:
+            if ctx.interaction:
+                await ctx.defer(ephemeral=True)
+            
+            confirm_msg = await ctx.send(
+                f"⚠️ **Large Server Detected** ({ctx.guild.member_count} members).\n"
+                f"Fetching invites might take a moment. Reply `yes` within {INVITES_CONFIRM_TIMEOUT}s to proceed."
             )
-            await ctx.send(warning_msg)
+
             def check(m):
-                return m.author == ctx.author and m.channel == ctx.channel
+                return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() == 'yes'
 
             try:
-                reply = await self.bot.wait_for("message", check=check, timeout=INVITES_CONFIRM_TIMEOUT)
-                if reply.content.strip().lower() != "confirm":
-                    return await ctx.send("Cancelled invites fetch.")
-            except asyncio.TimeoutError:
-                return await ctx.send("No confirmation received; cancelled invites fetch.")
+                await self.bot.wait_for('message', check=check, timeout=INVITES_CONFIRM_TIMEOUT)
+            except TimeoutError:
+                return await ctx.send("❌ Timed out. Cancelled invite fetch.")
+            
+            try:
+                await confirm_msg.delete()
+            except Exception:
+                pass
 
-        # Proceed to fetch invites, but be defensive about errors and limit displayed invites.
+        if ctx.interaction and not ctx.interaction.response.is_done():
+            await ctx.defer()
+
         try:
             invites = await ctx.guild.invites()
         except discord.Forbidden:
-            return await ctx.send("❌ I don't have permission to view invites in this server.")
+            return await ctx.send("❌ I don't have permission to view invites.")
         except Exception as e:
-            return await ctx.send(f"❌ Failed to fetch invites: `{e}`")
+            return await ctx.send(f"❌ Error fetching invites: `{e}`")
 
-        total_invites = len(invites)
-        if total_invites == 0:
-            return await ctx.send("No invites found.")
+        if not invites:
+            return await ctx.send("No active invites found.")
 
-        # Only display up to INVITES_DISPLAY_LIMIT invites to avoid overwhelming memory/UI.
-        display_invites = invites[:INVITES_DISPLAY_LIMIT]
+        original_count = len(invites)
+        if len(invites) > INVITES_DISPLAY_LIMIT:
+            invites = invites[:INVITES_DISPLAY_LIMIT]
+            limit_warning = f" (Showing first {INVITES_DISPLAY_LIMIT} of {original_count})"
+        else:
+            limit_warning = f" ({original_count})"
+
+        chunk_size = 10
+        chunks = [invites[i:i + chunk_size] for i in range(0, len(invites), chunk_size)]
+
         embeds = []
 
-        for inv in display_invites:
-            embed = discord.Embed(title="📨 Server Invites", color=discord.Color.red())
-            try:
-                inviter_str = f"{inv.inviter.mention}\n`{inv.inviter}`" if inv.inviter else "Unknown"
-            except Exception:
-                inviter_str = "Unknown"
-            embed.add_field(name="**👤 Inviter**", value=inviter_str, inline=True)
-            embed.add_field(name="**🔗 Invite code**", value=f"`{inv.code}`\n{getattr(inv, 'uses', 'N/A')} uses", inline=True)
-            if getattr(inv, "inviter", None) and getattr(inv.inviter, "display_avatar", None):
-                try:
-                    embed.set_thumbnail(url=inv.inviter.display_avatar.url)
-                except Exception:
-                    pass
+        for chunk in chunks:
+            embed = discord.Embed(
+                title=f"Server Invites{limit_warning}",
+                color=discord.Color.from_rgb(114, 137, 218)
+            )
+            
+            if ctx.guild.icon:
+                embed.set_thumbnail(url=ctx.guild.icon.url)
+
+            description_lines = []
+            
+            for inv in chunk:
+                link_str = f"[{inv.code}]({inv.url})"
+                inviter_str = inv.inviter.mention if inv.inviter else "`System/Unknown`"
+                
+                description_lines.append(f"{link_str} created by {inviter_str}")
+
+            embed.description = "\n".join(description_lines)
+            
+            if len(chunks) > 1:
+                embed.set_footer(text=f"Page {len(embeds) + 1}/{len(chunks)}")
+                
             embeds.append(embed)
 
-        footer_note = ""
-        if total_invites > INVITES_DISPLAY_LIMIT:
-            footer_note = f"Showing first {INVITES_DISPLAY_LIMIT} of {total_invites} invites. This command may be expensive on large servers."
+        view = InvitePages(embeds)
+        await ctx.send(embed=embeds[0], view=view)
 
-        # Send initial embed and optionally include footer note as a follow-up message for clarity.
-        await ctx.send(embed=embeds[0])
-        if footer_note:
-            await ctx.send(footer_note)
 
     @commands.hybrid_command(name="createinvite", help="Manager:Create a new invite link")
     @commands.guild_only()
@@ -181,7 +149,7 @@ class Manager(commands.Cog):
         """Create a new invite for a channel with optional max uses and expiry."""
         channel = channel or ctx.channel
         invite = await channel.create_invite(max_uses=max_uses, max_age=max_age)
-        await ctx.send(f"✅ Created invite link: {invite.url}")
+        await ctx.send(f"Created invite link: {invite.url}")
 
     @commands.hybrid_command(name="deleteinvite", help="Manager:Delete an existing invite link or all invites")
     @commands.guild_only()
@@ -341,7 +309,7 @@ class Manager(commands.Cog):
             except Exception as e:
                 return await ctx.send(f"❌ Failed to create role: `{e}`", ephemeral=True)
         else:
-            await ctx.send(f"ℹ️ Role `{role_name}` already exists.")
+            await ctx.send(f"ℹRole `{role_name}` already exists.")
     
     @commands.hybrid_command(name="assignrole", help="Manager: Assign an existing role to a user")
     @commands.guild_only()
