@@ -7,6 +7,7 @@ from typing import Optional
 import logging
 import random
 from constants.configs import WELCOME_CHANNEL_NAME, ASSETS_DIR, GIF_ATTACHMENTS_URL, GIF_ASSETS
+from constants.emojis import KurumiEmojis
 import asyncio
 
 """
@@ -193,6 +194,19 @@ class Events(commands.Cog):
 
         return False
 
+    async def _send_response(self, destination, content=None, embed=None, file=None) -> bool:
+        """
+        Sends a message using the _handle_mention logic.
+        """
+        try:
+            await destination.send(content=content, embed=embed, file=file)
+            return True
+        except discord.Forbidden:
+            return False
+        except discord.HTTPException as e:
+            self.logger.exception(f"HTTP error sending to {destination}: {e}")
+            return False
+        
     @commands.Cog.listener()
     async def on_ready(self):
         """
@@ -217,11 +231,14 @@ class Events(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         """
-        Welcome new members in the configured welcome channel.
+        Responds to a new member joining by sending a welcome message to the configured channel.
 
-        If a preloaded welcome GIF exists, the bot sends an embed with the GIF attached;
-        otherwise it falls back to a plain text welcome message. Permission errors are
-        silently ignored; other exceptions are logged.
+        Logic:
+        - Locates the welcome channel by name (defined in WELCOME_CHANNEL_NAME).
+        - If the 'welcome' GIF asset is preloaded, constructs a rich embed containing the GIF, 
+          custom emojis, and a welcome description.
+        - If the GIF asset is missing, falls back to a simple text-based welcome message.
+        - Utilizes `_send_response` to safely handle message delivery and suppress permission errors.
         """
         channel = discord.utils.get(member.guild.text_channels, name=WELCOME_CHANNEL_NAME)
         if not channel:
@@ -230,20 +247,17 @@ class Events(commands.Cog):
         gif = self.gifs.get("welcome")
         if gif:
             file = self._file_from_bytes(GIF_ASSETS["Kurumi_1"], gif)
-            embed = discord.Embed(title="💖 Welcome!", description=f"Welcome to the server, {member.mention}!", color=discord.Color.purple())
+            embed = discord.Embed(
+                title=f"{KurumiEmojis['KurumiLove']} Welcome!", 
+                description=f"Welcome to the server, {member.mention}!", 
+                color=discord.Color.purple()
+            )
             embed.set_image(url=GIF_ATTACHMENTS_URL["Kurumi_URL_1"])
-            try:
-                await channel.send(file=file, embed=embed)
-            except discord.Forbidden:
-                pass
-            except Exception as e:
-                self.logger.exception("Failed welcome send: %s", e)
+            
+            await self._send_response(channel, embed=embed, file=file)
         else:
-            try:
-                await channel.send(f"Welcome to the server, {member.mention}!")
-            except Exception:
-                pass
-
+            await self._send_response(channel, content=f"Welcome to the server, {member.mention}!")
+            
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """
@@ -294,16 +308,14 @@ class Events(commands.Cog):
 
     async def _handle_dm(self, message: discord.Message) -> bool:
         """
-        Respond to a direct message with a private embed explaining the bot is server-only.
+        Handles direct message interactions by enforcing cooldowns and sending a standard reply.
 
-        Sends a GIF if preloaded; handles Forbidden/HTTP exceptions gracefully and
-        returns True when a response was sent or attempted.
-
-        Args:
-            message: the DM message received.
-
-        Returns:
-            bool: True if a DM response was sent or attempted, False if rate-limited.
+        Logic:
+        - Checks the DM cooldown via `can_respond`. Returns False immediately if rate-limited.
+        - Constructs a 'Private Server Only' embed to inform the user of bot limitations.
+        - If the 'dm' GIF asset is loaded, attaches it to the response; otherwise sends just the embed.
+        - Uses `_send_response` to handle delivery and exceptions.
+        - Returns True if the logic proceeded to an attempted send.
         """
         if not self.can_respond(message.author.id, is_dm=True):
             return False
@@ -311,34 +323,28 @@ class Events(commands.Cog):
         gif = self.gifs.get("dm")
         embed = discord.Embed(
             title="Private Server Only",
-            description="😉 This bot is only available for private servers. Please contact the owner to invite it.",
+            description="This bot is only available for private servers. Please contact the owner to invite it.",
             color=discord.Color.purple()
         )
 
         if gif:
             file = self._file_from_bytes(GIF_ASSETS["Kurumi_3"], gif)
             embed.set_image(url=GIF_ATTACHMENTS_URL["Kurumi_URL_3"])
-            try:
-                await message.author.send(embed=embed, file=file)
-            except discord.Forbidden:
-                return True
-            except discord.HTTPException as e:
-                self.logger.exception("DM send HTTP error: %s", e)
-                return True
-            return True
+            await self._send_response(message.author, embed=embed, file=file)
         else:
-            try:
-                await message.author.send(embed=embed)
-            except Exception:
-                pass
-            return True
+            await self._send_response(message.author, embed=embed)
+            
+        return True
 
     async def _handle_mention(self, message: discord.Message) -> None:
         """
-        Reply to a mention in a guild channel with a friendly embed and optional GIF.
+        Responds to bot mentions in text channels with a greeting and visual asset.
 
-        Args:
-            message: The message that mentioned the bot.
+        Logic:
+        - Fetches the 'mention' GIF asset if available.
+        - Creates a friendly greeting embed.
+        - Attaches the GIF if present, linking it via `GIF_ATTACHMENTS_URL`.
+        - Delegates the actual sending to `_send_response` to manage permissions and HTTP errors safely.
         """
         gif = self.gifs.get("mention")
         embed = discord.Embed(description="Hello there, how can I help you today Master? ✨", color=discord.Color.purple())
@@ -346,18 +352,9 @@ class Events(commands.Cog):
         if gif:
             file = self._file_from_bytes(GIF_ASSETS["Kurumi_2"], gif)
             embed.set_image(url=GIF_ATTACHMENTS_URL["Kurumi_URL_2"])
-            try:
-                await message.channel.send(embed=embed, file=file)
-            except discord.Forbidden:
-                pass
-            except discord.HTTPException as e:
-                self.logger.exception("Mention send HTTP error: %s", e)
+            await self._send_response(message.channel, embed=embed, file=file)
         else:
-            try:
-                await message.channel.send(embed=embed)
-            except Exception:
-                pass
-
+            await self._send_response(message.channel, embed=embed)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Events(bot))
