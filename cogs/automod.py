@@ -12,7 +12,7 @@ from constants.configs import (
 )
 
 from utils.database import db
-from utils.moderation_utils import enforce_punishments
+from utils.moderationUtils import enforce_punishments
 
 """
 automod.py

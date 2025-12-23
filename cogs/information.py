@@ -4,9 +4,10 @@ import logging
 import io
 from discord.ext import commands
 from discord import app_commands
-from utils.help_paging import HelpPages, HelpView
+from utils.helpPaging import HelpPages, HelpView
 from constants.configs import PREFIX, GIF_ATTACHMENTS_URL, GIF_ASSETS
 from constants.emojis import CustomEmojis
+from utils.discordHelpers import create_choices
 
 """
 information.py
@@ -115,12 +116,12 @@ class Information(commands.Cog):
 
     @commands.hybrid_command( name="help",  help="Information:Shows this command list",  description="Shows a list of available commands.")
     @app_commands.describe(category="Choose a category to view")
-    @app_commands.choices(category=[
-        app_commands.Choice(name="Information", value="information"),
-        app_commands.Choice(name="Moderator", value="moderator"),
-        app_commands.Choice(name="Manager", value="manager"),
-        app_commands.Choice(name="Miscellaneous", value="miscellaneous"),
-    ])
+    @app_commands.choices(category=create_choices({
+        "Information": "information",
+        "Moderator": "moderator",
+        "Manager": "manager",
+        "Miscellaneous": "miscellaneous",
+    }))
     async def commands_hybrid(self, ctx: commands.Context, category: app_commands.Choice[str] = None):
         """
         Display the help pages or a single category.

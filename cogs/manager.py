@@ -5,9 +5,10 @@ from discord import app_commands, Interaction, Attachment
 from datetime import timedelta
 import re
 from typing import Optional
-from utils.colorchoises import color_choices
-from utils.invitepages import InvitePages
+from utils.colorChoices import color_choices
+from utils.invitePages import InvitePages
 from constants.configs import LARGE_SERVER_MEMBER_THRESHOLD, INVITES_CONFIRM_TIMEOUT, INVITES_DISPLAY_LIMIT
+from utils.discordHelpers import create_choices
 
 """
 manager.py
@@ -264,7 +265,7 @@ class Manager(commands.Cog):
         try:
             until_time = discord.utils.utcnow() + delta
             await member.edit(timed_out_until=until_time, reason=reason)
-            await ctx.reply(f"✅ {member.mention} has been timed out for {duration}.")
+            await ctx.reply(f"{member.mention} has been timed out for {duration}.")
         except discord.Forbidden:
             await ctx.reply("❌ I don't have permission to timeout this member.")
         except Exception as e:
@@ -334,7 +335,7 @@ class Manager(commands.Cog):
 
         try:
             await member.add_roles(role)
-            await ctx.send(f"✅ Role `{role.name}` assigned to {member.mention}.", ephemeral=True)
+            await ctx.send(f"Role `{role.name}` assigned to {member.mention}.", ephemeral=True)
         except discord.Forbidden:
             await ctx.send(f"❌ I don't have permission to assign roles to {member.mention}.", ephemeral=True)
         except Exception as e:
@@ -349,11 +350,11 @@ class Manager(commands.Cog):
         action="Choose what to do with the role",
         member="The member to remove the role from (only if choosing 'choose')"
     )
-    @app_commands.choices(action=[
-        app_commands.Choice(name="Remove from all members", value="remove_all"),
-        app_commands.Choice(name="Remove from specific member", value="choose"),
-        app_commands.Choice(name="Delete role completely", value="delete")
-    ])
+    @app_commands.choices(action=create_choices({
+        "Remove from all members": "remove_all",
+        "Remove from specific member": "choose",
+        "Delete role completely": "delete"
+    }))
     async def delrole(
         self,
         ctx: commands.Context,
@@ -373,7 +374,7 @@ class Manager(commands.Cog):
                 for m in role.members:
                     await m.remove_roles(role)
                     removed_count += 1
-                await ctx.send(f"✅ Removed `{role.name}` from all {removed_count} members.", ephemeral=True)
+                await ctx.send(f"Removed `{role.name}` from all {removed_count} members.", ephemeral=True)
             
             elif action.value == "choose":
                 if not member:
@@ -381,11 +382,11 @@ class Manager(commands.Cog):
                 if role not in member.roles:
                     return await ctx.send(f"❌ {member.mention} does not have the `{role.name}` role.", ephemeral=True)
                 await member.remove_roles(role)
-                await ctx.send(f"✅ Removed `{role.name}` from {member.mention}.", ephemeral=True)
+                await ctx.send(f"Removed `{role.name}` from {member.mention}.", ephemeral=True)
             
             elif action.value == "delete":
                 await role.delete()
-                await ctx.send(f"🗑️ Role `{role.name}` has been deleted.", ephemeral=True)
+                await ctx.send(f"Role `{role.name}` has been deleted.", ephemeral=True)
 
         except discord.Forbidden:
             await ctx.send("❌ I do not have permission to modify this role.", ephemeral=True)
@@ -410,7 +411,7 @@ class Manager(commands.Cog):
         """Change the bot's nickname in the guild (requires manage_nicknames)."""
         try:
             await ctx.guild.me.edit(nick=new_nick)
-            await ctx.send(f"✅ Changed nickname to `{new_nick}`.")
+            await ctx.send(f"Changed nickname to `{new_nick}`.")
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to change my nickname.")
 

@@ -8,9 +8,9 @@ from datetime import timedelta
 import logging
 from constants.configs import MAX_WARNINGS
 from utils.database import db
-from utils.moderation_utils import enforce_punishments
+from utils.moderationUtils import enforce_punishments
 from constants.configs import NO_REASON
-from utils.auditview import AuditLogView
+from utils.auditView import AuditLogView
 """
 moderator.py
 
@@ -251,7 +251,7 @@ class Moderator(commands.Cog):
         try:
             await ctx.guild.unban(target)
             await db.reset_warnings(target.id, ctx.guild.id)
-            await ctx.send(f"✅ Successfully unbanned {target.mention} and cleared their warnings.")
+            await ctx.send(f"Successfully unbanned {target.mention} and cleared their warnings.")
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to unban this user.")
         except Exception as e:
@@ -323,7 +323,7 @@ class Moderator(commands.Cog):
         """Create a new text channel optionally under a specified category."""
         target_category = category or ctx.channel.category
         new_channel = await ctx.guild.create_text_channel(name=name, category=target_category)
-        await ctx.send(f"✅ Channel `{new_channel.name}` created in `{target_category.name if target_category else 'No Category'}`.")
+        await ctx.send(f"Channel `{new_channel.name}` created in `{target_category.name if target_category else 'No Category'}`.")
         
     @commands.hybrid_command(name="clearchat", help="Moderator: Clear chats of the current channel")
     @commands.guild_only()
@@ -391,7 +391,7 @@ class Moderator(commands.Cog):
         except Exception as e:
             return await ctx.send(f"❌ Failed to set permissions: `{e}`")
 
-        await ctx.send(f"✅ Role {role.mention} was given access to this channel.")
+        await ctx.send(f"Role {role.mention} was given access to this channel.")
         
 async def setup(bot):
     await bot.add_cog(Moderator(bot))
