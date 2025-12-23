@@ -10,6 +10,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
