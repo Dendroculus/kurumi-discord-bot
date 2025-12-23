@@ -25,11 +25,22 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
+      - name: Debug environment
+        run: |
+          python --version
+          uname -a || true
+          echo "WORKDIR: $(pwd)"
+          ls -la
+          echo "requirements-dev.txt:"
+          sed -n '1,120p' requirements-dev.txt || true
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+          pip list
 
       - name: Run tests
         run: |
           python -m pytest -q
+
