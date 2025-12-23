@@ -70,7 +70,7 @@ class HelpPages:
             if not cmds:
                 continue
             embed = discord.Embed(
-                title=f"{KurumiEmojis["KurumiLove"]} {category} Commands",
+                title=f"{KurumiEmojis['KurumiLove']} {category} Commands",
                 color=discord.Color.purple()
             )
             embed.set_thumbnail(url=str(bot_instance.user.display_avatar.url))
