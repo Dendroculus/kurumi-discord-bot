@@ -43,6 +43,5 @@ if __name__ == "__main__":
     test_logger = setup_logging()
     test_logger.info("This is a test log entry to create the file.")
     bot = KurumiBot()
-    
-bot.run(DISCORD_TOKEN)
+    bot.run(DISCORD_TOKEN)
 
