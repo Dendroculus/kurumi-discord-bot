@@ -1,123 +1,123 @@
-[EN](https://github.com/Dendroculus/kurumi-discord-bot/blob/main/README.md) | CN 
+<div align="center">
+  <p>
+    <a href="https://github.com/Dendroculus/kurumi-discord-bot/blob/main/README.md">EN</a> | <strong>CN</strong>
+  </p>
 
-# Kurumi — Discord 机器人
+  <img src="../assets/emojis/kurumichibi.png" width="220" alt="Kurumi Chibi Logo" />
 
-Kurumi 是一个用 Python 编写的多功能 Discord 机器人，专注于服务器管理所需的审核、自动化和实用工具。
+  <h1>Kurumi — Discord 机器人</h1>
 
-<img src="https://github.com/Dendroculus/kurumi-discord-bot/blob/main/assets/emojis/kurumichibi.png" width="200" />
+  <p align="center">
+    <img src="https://img.shields.io/badge/Python-3.1.0+-blue.svg" alt="Python Version" />
+    <img src="https://img.shields.io/badge/discord.py-v2.x-7289DA.svg?logo=discord&logoColor=white" alt="discord.py" />
+    <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT" />
+    <img src="https://img.shields.io/badge/status-Active-green.svg" alt="Update Status" />
+  </p>
 
-
-## 🌟 功能
-- [x] 自动审核（垃圾信息和脏话过滤）  
-- [x] 信息命令  
-- [x] 管理员工具  
-- [x] 杂项实用工具  
-- [x] 版主工具  
-
-Kurumi 已实现约 40 个命令，覆盖常见的管理与实用场景。
-
-
-
-## 🚀 状态
-Kurumi 已达到最终版本。  
-当前重点是稳定性和完善；将以稳定为主，可能会偶尔添加新功能或修复 bug。
+  <p>
+    <em>一个专注于审核、自动化和实用工具的多功能 Discord 机器人。</em><br />
+    功能完备，运行稳定，随时为您服务。
+  </p>
+</div>
 
 
+## ✨ 功能特性
 
-## 📜 许可证
-本项目采用 MIT 许可证授权 — 您可以自由使用、修改和分发，但须保留原作者署名与许可文件。详见仓库中的 `LICENSE` 文件。
+Kurumi 包含 42 个命令，旨在让服务器管理变得更轻松、更有趣。
 
+&nbsp; 🛡️ AutoMod (自动审核) — 高级防护功能，拦截垃圾信息和脏话，保持聊天环境整洁。 <br>
+&nbsp; 🔧 Moderation (管理工具) — 用于踢出、封禁和高效管理用户的必要工具。 <br>
+&nbsp; ℹ️ Information (信息查询) — 详细的服务器信息、用户信息及实用查询功能。 <br>
+&nbsp; 🔨 Manager Tools (管理员工具) — 用于服务器配置的管理实用程序。 <br>
+&nbsp; 🎀 Utilities (杂项功能) — 社区所需的各种有趣且实用的命令。
 
+## 🚀 项目状态
 
-## ⚠️ 免责声明
-- Kurumi 是独立项目，与 Discord Inc. 无关，亦不受其支持或认可。  
-- 所有与 Discord 相关的商标和版权归其各自所有者所有。  
-- 展示的动漫角色与艺术作品归各自创作者所有。  
-- 所有表情符号资产由作者制作，仅用于非商业、个人作品集用途。
-
-
-
-## ⚠️ 资源与注意事项
-- 仓库不包含 GIF 文件。若命令依赖 GIF 输出，请将 `kurumi.gif`（及其他所需文件）放入 `assets/` 文件夹。  
-- 请将自定义表情文件上传到 Discord 开发者门户，并在代码中更新表情 ID，以正确显示表情。
+注意： Kurumi 已达到最终版本。  
+机器人功能已完备，目前的开发重点是稳定性和打磨。偶尔可能会添加新功能，但核心体验已完成。
 
 
+## 🛠️ 安装与设置
 
-## 🎨 艺术作品署名
-本项目中使用的 Q 版角色艺术作品由原作者创作，仅用于非商业、个人作品集目的。请在使用或再发布时尊重原作者权利并注明出处。
-
-
-
-## ⚙️ 数据来源
-- 动漫信息：AniList API  
-- 动漫角色信息：Jikan API
-
-
-
-## 🛠️ 安装与要求
+请按照以下步骤在您的设备上运行 Kurumi。
 
 1. 克隆仓库
-   ```bash
-   git clone https://github.com/your-username/your-repo.git
-   cd your-repo
-   ```
+```bash
+git clone https://github.com/Dendroculus/kurumi-discord-bot.git
+cd kurumi-discord-bot
+```
 
-2. （可选）创建并激活虚拟环境
+2. 设置虚拟环境（可选但推荐）
+```bash
+# 创建环境
+python -m venv venv
 
-   Linux / macOS:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
+# 激活环境:
+# Windows (PowerShell)
+venv\Scripts\Activate.ps1
 
-   Windows (PowerShell):
-   ```powershell
-   python -m venv venv
-   .\venv\Scripts\Activate.ps1
-   ```
+# Windows (cmd)
+venv\Scripts\activate
 
-3. 安装依赖项
+# Linux / macOS
+source venv/bin/activate
+```
 
-   - 依赖包：
-     - discord.py
-     - better_profanity
-     - aiohttp
-     - python-dotenv
+3. 安装依赖
+```bash
+pip install -r requirements.txt
+```
 
-   使用 pip 安装：
-   ```bash
-   pip install -r requirements.txt
-   ```
-   或者单独安装：
-   ```bash
-   pip install discord.py better_profanity aiohttp python-dotenv
-   ```
+核心库：
 
-4. 创建 `.env` 文件  
-   在项目根目录内（已在 `.gitignore` 中），创建 `.env` 并添加您的机器人令牌。例如：
-   ```env
-   DISCORD_TOKEN=your_bot_token_here
-   # 如果需要其他 API Key，可在此继续添加：
-   # ANILIST_CLIENT_ID=...
-   # ANILIST_CLIENT_SECRET=...
-   ```
+- discord.py  
+- better_profanity  
+- aiohttp  
+- python-dotenv  
+- asyncpg  
+- Pillow
 
-5. 运行机器人  
-   运行主脚本（根据仓库实际入口文件，可为 `bot.py`、`main.py` 等）：
-   ```bash
-   python bot.py
-   ```
-   或
-   ```bash
-   python main.py
-   ```
+4. 配置环境
+
+在项目根目录下创建一个 `.env` 文件并添加您的凭据：
+
+```env
+DISCORD_TOKEN=your_bot_token_here
+DATABASE_URL=postgresql://user:pass@localhost/dbname
+REDIS_URL=redis://localhost
+```
+
+5. 启动
+
+```bash
+python main.py
+```
 
 
+## 🎨 致谢与版权声明
 
-## ✅ 进一步帮助
-您还需要我为该项目翻译其他文件（例如 `LICENSE`、代码注释、命令说明等）吗？我可以：
-- 将 README 转为多语言版本；
-- 翻译或注释关键代码文件；
-- 为每个命令生成使用文档或示例配置。
+艺术作品
 
-如需我继续翻译或生成文档，请告诉我想要处理的文件或目录路径。
+本项目中的 Q 版角色插图由 [@pypy_nemui](https://x.com/pypy_nemui/status/1130490628096217088) 创作。  
+仅用于非商业及作品集展示目的。
+
+数据来源
+
+动漫信息和角色数据由 AniList API 提供支持
+<a href="https://anilist.co/">
+  <img src="https://anilist.co/img/icons/android-chrome-512x512.png" width="20" alt="AniList" align="top" />
+</a>
+
+## ⚖️ 许可证与免责声明
+
+本项目基于 MIT 许可证开源 — 详见 [LICENSE](LICENSE)。  
+
+免责声明：
+
+- Kurumi 是一个独立项目，不隶属于 Discord Inc.，也不受其认可或支持。  
+- 所有动漫角色和艺术作品均归其各自创作者所有。  
+- 表情符号资产由开发者制作。如果您分叉（fork）了此仓库，请将表情文件上传到您的 Discord 开发者门户并在代码中更新 ID。
+
+<div align="center">
+  <sub>💜 作者：<a href="https://github.com/Dendroculus">Dendroculus</a></sub>
+</div>
