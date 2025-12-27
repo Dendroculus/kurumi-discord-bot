@@ -7,7 +7,8 @@ import discord
 from collections import OrderedDict
 from typing import List, Set, Tuple, Optional
 from discord.ext import commands
-from constants.configs import CACHE_MAX_SIZE, CACHE_TTL_SECONDS, SAFE_BROWSING_URL
+from constants.configs import CACHE_MAX_SIZE, CACHE_TTL_SECONDS, SAFE_BROWSING_URL, MAX_WARNINGS
+from utils.moderationUtils import enforce_punishments
 
 class SafeBrowsingClient:
     """
@@ -135,25 +136,46 @@ class AntiScam(commands.Cog):
             await self._punish(message, confirmed_threats)
 
     async def _punish(self, message: discord.Message, threats: Set[str]):
-        """Executes moderation actions against the message and author."""
+        """
+        Executes moderation actions:
+        1. Deletes the scam link.
+        2. Adds a warning to the user's record (synced with AutoMod).
+        3. Enforces punishments (Mute/Kick/Ban) if warning threshold is reached.
+        """
         try:
             await message.delete()
         except discord.NotFound:
-            pass
+            self.logger.debug(f"Failed to delete message {message.id} - it was already deleted.")
+        except discord.Forbidden:
+            self.logger.error(f"Failed to delete message {message.id} - Missing 'Manage Messages' permission.")
 
         self.logger.warning(
             f"SCAM DETECTED: User {message.author.id} in Guild {message.guild.id}. Links: {threats}"
         )
 
-        try:
+        automod = self.bot.get_cog("AutoMod")
+        if automod:
+            count = await automod.on_message_warn(message.author.id, message.guild.id)
+            
             embed = discord.Embed(
                 title="🛡️ Security Alert",
-                description=f"{message.author.mention}, your message contained malicious links and was removed.",
+                description=(
+                    f"{message.author.mention}, malicious link detected!\n"
+                    f"Warning `{count}`/{MAX_WARNINGS}."
+                ),
                 color=discord.Color.red()
             )
             await message.channel.send(embed=embed, delete_after=10)
-        except discord.HTTPException:
-            pass
+
+            await enforce_punishments(
+                member=message.author,
+                count=count,
+                channel=message.channel,
+                logger=self.logger
+            )
+        else:
+            self.logger.error("AutoMod cog not found! Cannot enforce punishments.")
+            await message.channel.send(f"🛡️ {message.author.mention}, link removed.", delete_after=10)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiScam(bot))
