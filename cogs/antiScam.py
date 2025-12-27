@@ -80,8 +80,8 @@ class AntiScam(commands.Cog):
         self.cache: OrderedDict[str, Tuple[bool, float]] = OrderedDict()
         
         self.url_pattern = re.compile(
-            r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
-        )
+            r'https?://(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d+)?(?:/[^\s]*)?'
+    )
 
     def _get_domain(self, url: str) -> str:
         """Extracts the network location (domain) from a URL for caching purposes."""
