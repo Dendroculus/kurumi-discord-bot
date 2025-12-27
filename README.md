@@ -80,7 +80,7 @@ Create a `.env` file in the project root and add your credentials:
 ```env
 DISCORD_TOKEN=your_bot_token_here
 DATABASE_URL=postgresql://user:pass@localhost/dbname
-REDIS_URL=redis://localhost
+GOOGLE_SAFE_BROWSING_API_KEY=AIzaYour_api_key_here
 ```
 
 5. Launch

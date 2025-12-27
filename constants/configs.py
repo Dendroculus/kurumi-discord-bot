@@ -29,6 +29,7 @@ LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 PREFIX = os.environ.get("BOT_PREFIX", "k!")
 WELCOME_CHANNEL_NAME = os.environ.get("WELCOME_CHANNEL_NAME", "💬-general")
 
+
 MAX_TRACKED_USERS = int(os.environ.get("MAX_TRACKED_USERS", "5000"))
 MAX_WARNINGS = int(os.environ.get("MAX_WARNINGS", "10"))
 TIMEOUT_AT_WARNINGS = int(os.environ.get("TIMEOUT_AT_WARNINGS", "3"))
@@ -126,3 +127,9 @@ query ($search: String) {
 LARGE_SERVER_MEMBER_THRESHOLD = 1000  # If the guild has more members than this, warn before fetching invites
 INVITES_DISPLAY_LIMIT = 50            # Max number of invites to display/process to avoid large memory use
 INVITES_CONFIRM_TIMEOUT = 20          # Seconds to wait for user confirmation on large servers
+
+
+# Cache settings for anti-scam URL checks
+CACHE_MAX_SIZE = 1000
+CACHE_TTL_SECONDS = 3600 
+SAFE_BROWSING_URL = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
