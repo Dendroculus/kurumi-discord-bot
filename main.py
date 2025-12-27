@@ -31,7 +31,8 @@ class KurumiBot(commands.AutoShardedBot):
             "cogs.miscellaneous",
             "cogs.manager",
             "cogs.events",
-            "cogs.errors"
+            "cogs.errors",
+            "cogs.antiScam",
         ]
         for ext in extensions:
             try:
