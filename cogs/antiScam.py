@@ -6,7 +6,6 @@ import aiohttp
 import discord
 from collections import OrderedDict
 from typing import List, Set, Tuple, Optional
-from urllib.parse import urlparse
 from discord.ext import commands
 from constants.configs import CACHE_MAX_SIZE, CACHE_TTL_SECONDS, SAFE_BROWSING_URL
 
@@ -83,42 +82,27 @@ class AntiScam(commands.Cog):
             r'https?://(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d+)?(?:/[^\s]*)?'
     )
 
-    def _get_domain(self, url: str) -> str:
-        """Extracts the network location (domain) from a URL for caching purposes."""
-        try:
-            return urlparse(url).netloc
-        except Exception:
-            return url
-
     def _check_cache(self, url: str) -> Optional[bool]:
-        """
-        Retrieves the safety status of a URL's domain from the cache.
-
-        Returns:
-            True if safe, False if unsafe, None if not in cache or expired.
-        """
-        domain = self._get_domain(url)
-        if domain not in self.cache:
+        """ Checks the cache for the URL's safety status. """
+        if url not in self.cache:
             return None
 
-        is_safe, timestamp = self.cache[domain]
+        is_safe, timestamp = self.cache[url]
         
         if time.time() - timestamp > CACHE_TTL_SECONDS:
-            del self.cache[domain]
+            del self.cache[url]
             return None
 
-        self.cache.move_to_end(domain)
+        self.cache.move_to_end(url)
         return is_safe
 
     def _update_cache(self, urls: List[str], bad_urls: Set[str]):
-        """Updates the internal cache with new scan results."""
+        """ Updates the cache with the results from the API scan. """
         now = time.time()
         for url in urls:
-            domain = self._get_domain(url)
             is_bad = url in bad_urls
-            
-            self.cache[domain] = (not is_bad, now)
-            self.cache.move_to_end(domain)
+            self.cache[url] = (not is_bad, now)
+            self.cache.move_to_end(url)
 
         while len(self.cache) > CACHE_MAX_SIZE:
             self.cache.popitem(last=False)
