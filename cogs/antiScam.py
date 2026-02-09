@@ -16,7 +16,6 @@ class SafeBrowsingClient:
     
     Attributes:
         api_key (str): The Google API key derived from environment variables.
-        session (aiohttp.ClientSession): The HTTP session for making requests.
     """
 
     def __init__(self):
@@ -24,12 +23,13 @@ class SafeBrowsingClient:
         if not self.api_key:
             logging.getLogger("bot").warning("GOOGLE_SAFE_BROWSING_API_KEY not found in environment.")
 
-    async def check_urls(self, urls: List[str]) -> Set[str]:
+    async def check_urls(self, urls: List[str], session: aiohttp.ClientSession) -> Set[str]:
         """
         Queries the API to determine if any of the provided URLs are malicious.
 
         Args:
             urls: A list of URL strings to check.
+            session: The shared aiohttp ClientSession to use for the request.
 
         Returns:
             A set of URLs identified as threats.
@@ -50,15 +50,14 @@ class SafeBrowsingClient:
         params = {'key': self.api_key}
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(SAFE_BROWSING_URL, json=payload, params=params) as resp:
-                    if resp.status != 200:
-                        logging.getLogger("bot").error(f"Safe Browsing API returned {resp.status}")
-                        return set()
-                    
-                    data = await resp.json()
-                    matches = data.get('matches', [])
-                    return {match['threat']['url'] for match in matches}
+            async with session.post(SAFE_BROWSING_URL, json=payload, params=params) as resp:
+                if resp.status != 200:
+                    logging.getLogger("bot").error(f"Safe Browsing API returned {resp.status}")
+                    return set()
+                
+                data = await resp.json()
+                matches = data.get('matches', [])
+                return {match['threat']['url'] for match in matches}
 
         except Exception as e:
             logging.getLogger("bot").error(f"Failed to check URLs: {e}")
@@ -72,16 +71,17 @@ class AntiScam(commands.Cog):
     Implements an LRU (Least Recently Used) cache to minimize API latency and quota usage.
     """
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot, scanner: Optional[SafeBrowsingClient] = None):
         self.bot = bot
         self.logger = logging.getLogger("bot")
-        self.scanner = SafeBrowsingClient()
+        # Dependency Injection: Use provided scanner or instantiate a default one
+        self.scanner = scanner or SafeBrowsingClient()
         
         self.cache: OrderedDict[str, Tuple[bool, float]] = OrderedDict()
         
         self.url_pattern = re.compile(
             r'https?://(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d+)?(?:/[^\s]*)?'
-    )
+        )
 
     def _check_cache(self, url: str) -> Optional[bool]:
         """ Checks the cache for the URL's safety status. """
@@ -127,8 +127,9 @@ class AntiScam(commands.Cog):
             elif cached_status is None:
                 urls_to_scan.append(url)
 
-        if urls_to_scan:
-            api_threats = await self.scanner.check_urls(urls_to_scan)
+        # Use self.bot.session instead of a local session
+        if urls_to_scan and hasattr(self.bot, 'session') and self.bot.session:
+            api_threats = await self.scanner.check_urls(urls_to_scan, self.bot.session)
             confirmed_threats.update(api_threats)
             self._update_cache(urls_to_scan, api_threats)
 

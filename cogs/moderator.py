@@ -98,7 +98,6 @@ class Moderator(commands.Cog):
 
         await new_channel.send(embed=embed)
 
-    # Replaced role-based mute with built-in timeout for standardization
     @commands.hybrid_command(name="mute", help="Moderator: Temporarily mute (timeout) a member")
     @commands.guild_only()
     @commands.has_permissions(moderate_members=True)
@@ -285,8 +284,7 @@ class Moderator(commands.Cog):
                 overwrites[member] = PermissionOverwrite(view_channel=True, send_messages=True)
 
         await channel.edit(overwrites=overwrites, reason=f"Locked by {ctx.author}")
-
-        await ctx.send("🔒 Channel locked: only top role and admins (including admin bots) can view/send.")
+        await ctx.send("🔒 Channel locked: only top role and admins (including admin bots) can view/send.", ephemeral=True)
 
     @commands.hybrid_command(name="unlock", help="Moderator:Unlock the current channel")
     @commands.guild_only()
