@@ -8,7 +8,7 @@ from collections import OrderedDict
 from typing import List, Set, Tuple, Optional
 from discord.ext import commands
 from constants.configs import CACHE_MAX_SIZE, CACHE_TTL_SECONDS, SAFE_BROWSING_URL, MAX_WARNINGS
-from utils.moderationUtils import enforce_punishments
+from utils.mod_utils import enforce_punishments
 
 class SafeBrowsingClient:
     """

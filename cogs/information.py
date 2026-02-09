@@ -5,10 +5,10 @@ import io
 from typing import Optional
 from discord.ext import commands
 from discord import app_commands
-from utils.helpPaging import HelpPages, HelpView
+from utils.paging_helper import HelpPages, HelpView
 from constants.configs import PREFIX, GIF_ATTACHMENTS_URL, GIF_ASSETS
 from constants.emojis import CustomEmojis
-from utils.discordHelpers import create_choices
+from utils.discord_helpers import create_choices
 from constants.assets import AssetService
 
 """
@@ -185,7 +185,7 @@ class Information(commands.Cog):
         ]
         self.add_embed_fields(embed=embed, fields=fields)
 
-        gif_bytes = self.asset_service.get_asset("info")
+        gif_bytes = self    .asset_service.get_asset("info")
         
         if gif_bytes:
             file = discord.File(io.BytesIO(gif_bytes), filename=GIF_ASSETS["Kurumi"])

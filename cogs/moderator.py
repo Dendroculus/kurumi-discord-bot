@@ -7,10 +7,10 @@ import re
 from datetime import timedelta
 import logging
 from constants.configs import MAX_WARNINGS
-from utils.database import db
-from utils.moderationUtils import enforce_punishments
+from utils.mod_utils import enforce_punishments
 from constants.configs import NO_REASON
-from utils.auditView import AuditLogView
+from utils.audit_view import AuditLogView
+
 """
 moderator.py
 
@@ -21,13 +21,12 @@ Responsibilities:
 - Channel and role management commands: lock/unlock channels, create/delete channels, add role permissions for locked channels.
 - Role management: create, assign, rename, delete role-related actions are covered in manager.py; this cog focuses on moderator actions.
 - Audit log viewing: paginated, ephemeral view of recent audit log entries for authorized users.
-- Integrates with `utils.database.db` for warning persistence and `utils.moderation_utils.enforce_punishments`
+- Integrates with `self.bot.db` for warning persistence and `utils.moderation_utils.enforce_punishments`
   to apply escalation logic based on warning counts.
 
 Notes:
 - The cog expects the bot to have permission to perform the requested actions; permission errors are caught and reported.
 - Time durations are parsed using compact strings like '10s', '5m', '1h', '1d'.
-- This file only adds documentation; no logic or behavior has been modified.
 """
 
 class Moderator(commands.Cog):
@@ -172,12 +171,12 @@ class Moderator(commands.Cog):
         """
         Issue a persistent warning to a member and run the same escalation logic used by AutoMod.
 
-        Persists a warning count via utils.database.db.increase_warning and calls enforce_punishments.
+        Persists a warning count via self.bot.db.increase_warning and calls enforce_punishments.
         """
         if member.bot:
             return await ctx.send("🤖 You can't warn a bot.")
 
-        count = await db.increase_warning(member.id, ctx.guild.id)
+        count = await self.bot.db.increase_warning(member.id, ctx.guild.id)
         await ctx.send(f"⚠️ {member.mention} has been warned. ({count}/{MAX_WARNINGS}) Reason: {reason}")
 
         # Apply the same consolidated punishment logic as AutoMod
@@ -214,7 +213,7 @@ class Moderator(commands.Cog):
         """
         Remove all warnings for a user.
         """
-        await db.reset_warnings(member.id, ctx.guild.id)
+        await self.bot.db.reset_warnings(member.id, ctx.guild.id)
         await ctx.send(f"All warnings for {member.mention} have been removed.")
     
     @commands.hybrid_command(name="unban",help="Moderator: Unban a user and reset their warnings")
@@ -249,7 +248,7 @@ class Moderator(commands.Cog):
 
         try:
             await ctx.guild.unban(target)
-            await db.reset_warnings(target.id, ctx.guild.id)
+            await self.bot.db.reset_warnings(target.id, ctx.guild.id)
             await ctx.send(f"Successfully unbanned {target.mention} and cleared their warnings.")
         except discord.Forbidden:
             await ctx.send("❌ I don't have permission to unban this user.")
