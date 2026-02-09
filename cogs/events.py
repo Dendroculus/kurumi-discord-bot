@@ -6,9 +6,10 @@ import time
 from typing import Optional
 import logging
 import random
-from constants.configs import WELCOME_CHANNEL_NAME, ASSETS_DIR, GIF_ATTACHMENTS_URL, GIF_ASSETS
+from constants.configs import WELCOME_CHANNEL_NAME, GIF_ATTACHMENTS_URL, GIF_ASSETS
 from constants.emojis import KurumiEmojis
 import asyncio
+from constants.assets import AssetService
 
 """
 events.py
@@ -19,11 +20,11 @@ Responsibilities:
 - Handle bot lifecycle events (on_ready) and member join/welcome flow.
 - Monitor messages for profanity and delete offending messages.
 - Respond to DMs and mentions with configurable cooldowns and optional GIF assets.
-- Preloads small binary assets (GIFs) from a configured assets directory to avoid
-  file I/O on every event.
+- Delegates asset loading to AssetService.
 
 Integration expectations:
-- utils.config must provide ASSETS_DIR (path-like), WELCOME_CHANNEL_NAME, and other configuration values.
+- utils.config must provide WELCOME_CHANNEL_NAME, and other configuration values.
+- utils.assets.AssetService is used to retrieve binary assets.
 - better_profanity.profanity is used to detect profanity in messages.
 - The bot is expected to be a discord.ext.commands.Bot instance with application commands available for sync.
 """
@@ -33,7 +34,7 @@ class Events(commands.Cog):
     Cog that handles various Discord events: ready, member join, and message handling.
 
     Key behaviors:
-    - Preloads assets (GIFs) referenced by key names ("welcome", "mention", "dm") into memory.
+    - Uses AssetService to retrieve GIFs referenced by key names ("welcome", "mention", "dm").
     - Enforces per-user and per-channel cooldowns to avoid spamming responses for mentions and DMs.
     - Deletes messages that contain profanity and notifies the user in-channel.
     - Replies to direct messages with a private "this bot is for servers only" response.
@@ -41,21 +42,24 @@ class Events(commands.Cog):
 
     Attributes:
         bot: the bot instance.
+        asset_service: Service for retrieving binary assets.
         mention_cooldown / dm_cooldown / global_cooldown / channel_cooldown:
             cooldown durations (in seconds) for different response types.
         mention_cooldowns, dm_cooldowns, global_cooldowns, channel_cooldowns:
             dicts mapping IDs to last-response timestamps.
-        gifs: mapping of asset key -> bytes for preloaded GIFs.
         logger: logger instance used for diagnostics.
     """
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot, asset_service: Optional[AssetService] = None):
         """
         Initialize the Events cog.
 
         Args:
             bot: The Bot instance this cog will be attached to.
+            asset_service: Optional AssetService instance (dependency injection). 
+                           If None, a new instance is created.
         """
         self.bot = bot
+        self.asset_service = asset_service or AssetService()
 
         self.mention_cooldown = 30
         self.dm_cooldown = 3600
@@ -68,9 +72,7 @@ class Events(commands.Cog):
         self.global_cooldowns: dict[int, float] = {}
         self.channel_cooldowns: dict[int, float] = {}
 
-        self.gifs: dict[str, bytes] = {}
         self.logger = logging.getLogger("bot")
-        self._preload_assets()
         
     def _purge_dict(self, target_dict: dict, cooldown: float, current_time: float):
         """Helper to remove expired keys from a specific dictionary."""
@@ -94,30 +96,6 @@ class Events(commands.Cog):
             self.dm_cooldowns.clear()
             self.channel_cooldowns.clear()
             self.logger.warning("Cache hit max size! Forced clear performed.")
-
-    def _preload_assets(self) -> None:
-        """
-        Load configured asset files into memory.
-
-        Looks up file names relative to config.ASSETS_DIR. Missing assets are logged
-        at WARNING level; unexpected errors during load are logged at ERROR level.
-        """
-        base_path = ASSETS_DIR
-        files = {
-            "info": GIF_ASSETS["Kurumi"],
-            "welcome": GIF_ASSETS["Kurumi_1"],
-            "mention": GIF_ASSETS["Kurumi_2"],
-            "dm": GIF_ASSETS["Kurumi_3"],
-        }
-        for key, fname in files.items():
-            path = base_path / fname
-            try:
-                with open(path, "rb") as f:
-                    self.gifs[key] = f.read()
-            except FileNotFoundError:
-                self.logger.warning("Asset missing: %s (key=%s)", path, key)
-            except Exception as e:
-                self.logger.exception("Error loading asset %s: %s", path, e)
 
     def _file_from_bytes(self, name: str, bytes_data: bytes) -> discord.File:
         """
@@ -235,8 +213,7 @@ class Events(commands.Cog):
 
         Logic:
         - Locates the welcome channel by name (defined in WELCOME_CHANNEL_NAME).
-        - If the 'welcome' GIF asset is preloaded, constructs a rich embed containing the GIF, 
-          custom emojis, and a welcome description.
+        - If the 'welcome' GIF asset is available via AssetService, constructs a rich embed.
         - If the GIF asset is missing, falls back to a simple text-based welcome message.
         - Utilizes `_send_response` to safely handle message delivery and suppress permission errors.
         """
@@ -244,7 +221,7 @@ class Events(commands.Cog):
         if not channel:
             return
 
-        gif = self.gifs.get("welcome")
+        gif = self.asset_service.get_asset("welcome")
         if gif:
             file = self._file_from_bytes(GIF_ASSETS["Kurumi_1"], gif)
             embed = discord.Embed(
@@ -313,14 +290,14 @@ class Events(commands.Cog):
         Logic:
         - Checks the DM cooldown via `can_respond`. Returns False immediately if rate-limited.
         - Constructs a 'Private Server Only' embed to inform the user of bot limitations.
-        - If the 'dm' GIF asset is loaded, attaches it to the response; otherwise sends just the embed.
+        - If the 'dm' GIF asset is available via AssetService, attaches it to the response.
         - Uses `_send_response` to handle delivery and exceptions.
         - Returns True if the logic proceeded to an attempted send.
         """
         if not self.can_respond(message.author.id, is_dm=True):
             return False
 
-        gif = self.gifs.get("dm")
+        gif = self.asset_service.get_asset("dm")
         embed = discord.Embed(
             title="Private Server Only",
             description="This bot is only available for private servers. Please contact the owner to invite it.",
@@ -341,12 +318,12 @@ class Events(commands.Cog):
         Responds to bot mentions in text channels with a greeting and visual asset.
 
         Logic:
-        - Fetches the 'mention' GIF asset if available.
+        - Fetches the 'mention' GIF asset via AssetService if available.
         - Creates a friendly greeting embed.
         - Attaches the GIF if present, linking it via `GIF_ATTACHMENTS_URL`.
         - Delegates the actual sending to `_send_response` to manage permissions and HTTP errors safely.
         """
-        gif = self.gifs.get("mention")
+        gif = self.asset_service.get_asset("mention")
         embed = discord.Embed(description="Hello there, how can I help you today Master? ✨", color=discord.Color.purple())
 
         if gif:
