@@ -2,12 +2,14 @@ import discord
 import time
 import logging
 import io
+from typing import Optional
 from discord.ext import commands
 from discord import app_commands
 from utils.helpPaging import HelpPages, HelpView
 from constants.configs import PREFIX, GIF_ATTACHMENTS_URL, GIF_ASSETS
 from constants.emojis import CustomEmojis
 from utils.discordHelpers import create_choices
+from constants.assets import AssetService
 
 """
 information.py
@@ -16,18 +18,13 @@ Provides informational and utility commands for the Kurumi Discord bot.
 
 Responsibilities:
 - Generate context-aware help pages from registered commands and present them in a paginated View.
-- Provide basic server and bot information commands:
-  - membercount: show current server member count
-  - serverstats: detailed server statistics embed
-  - member: list members in a given role (capped)
-  - ping: show bot latency
-  - help: interactive/help pages (hybrid command)
-  - info: bot information and uptime
+- Provide basic server and bot information commands.
+- Delegates asset loading to AssetService.
 
 Integration expectations:
 - Commands should include a help string in the format "Category: Description" for inclusion in help pages.
 - utils.config should provide PREFIX used to format shown command usage.
-- Assets directory contains "kurumi.gif" used by the info command; when missing, sending the file will raise as usual.
+- utils.assets.AssetService is used to retrieve binary assets.
 """
 
 start_time = time.time()
@@ -45,8 +42,17 @@ class Information(commands.Cog):
     - help: Show categorized command list (interactive).
     - info: Show bot identity, uptime, and other metadata.
     """
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot, asset_service: Optional[AssetService] = None):
+        """
+        Initialize the Information cog.
+
+        Args:
+            bot: The Bot instance.
+            asset_service: Optional AssetService instance (dependency injection).
+                           If None, a new instance is created.
+        """
         self.bot = bot
+        self.asset_service = asset_service or AssetService()
         
     @staticmethod
     def add_embed_fields(embed, fields: list[tuple[str, any, bool]]):
@@ -155,9 +161,7 @@ class Information(commands.Cog):
         """
         Show bot information including uptime, server count, prefix, and other metadata.
 
-        Reads the 'kurumi.gif' asset from the repository's assets directory and sends it
-        alongside the embed. If the file is missing, the File constructor will raise
-        as normal; the command intentionally does not swallow that error.
+        Reads the 'info' asset from AssetService and sends it alongside the embed. 
         """
         uptime_seconds = int(time.time() - start_time)
         hours, remainder = divmod(uptime_seconds, 3600)
@@ -181,14 +185,13 @@ class Information(commands.Cog):
         ]
         self.add_embed_fields(embed=embed, fields=fields)
 
-        events_cog = self.bot.get_cog("Events")
+        gif_bytes = self.asset_service.get_asset("info")
         
-        if events_cog and "info" in events_cog.gifs :
-            gif_bytes = events_cog.gifs["info"]
+        if gif_bytes:
             file = discord.File(io.BytesIO(gif_bytes), filename=GIF_ASSETS["Kurumi"])
             await ctx.send(file=file, embed=embed)
         else:
-            await ctx.send(embed=embed) # fallback 
+            await ctx.send(embed=embed) 
     
     
 async def setup(bot):
