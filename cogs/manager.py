@@ -5,10 +5,10 @@ from discord import app_commands, Interaction, Attachment
 from datetime import timedelta
 import re
 from typing import Optional
-from utils.colorChoices import color_choices
+from utils.color_choices import color_choices
 from utils.invitePages import InvitePages
 from constants.configs import LARGE_SERVER_MEMBER_THRESHOLD, INVITES_CONFIRM_TIMEOUT, INVITES_DISPLAY_LIMIT
-from utils.discordHelpers import create_choices
+from utils.discord_helpers import create_choices
 
 """
 manager.py

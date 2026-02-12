@@ -5,7 +5,7 @@ import aiohttp
 from typing import Optional
 import asyncio
 import logging
-from utils.animeHelper import (
+from utils.anime_helper import (
     build_anime_embed, 
     build_character_embed, 
     build_anime_options, 

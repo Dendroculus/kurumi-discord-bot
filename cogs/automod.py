@@ -11,8 +11,7 @@ from constants.configs import (
     MAX_TRACKED_USERS,
 )
 
-from utils.database import db
-from utils.moderationUtils import enforce_punishments
+from utils.mod_utils import enforce_punishments
 
 """
 automod.py
@@ -26,7 +25,7 @@ Responsibilities:
 
 Expectations / Integration Points:
 - Expects `utils.config` to provide configuration constants.
-- Expects `utils.database.db` for warning persistence.
+- Expects `self.bot.db` to be initialized for warning persistence.
 - Expects `utils.moderation_utils.enforce_punishments` for escalation logic.
 """
 
@@ -53,13 +52,13 @@ class AutoMod(commands.Cog):
         self.logger = logging.getLogger("bot")
 
     async def on_message_warn(self, user_id: int, guild_id: int) -> int:
-        return await db.increase_warning(user_id, guild_id)
+        return await self.bot.db.increase_warning(user_id, guild_id)
 
     async def get_warnings(self, user_id: int, guild_id: int):
-        return await db.get_warnings(user_id, guild_id)
+        return await self.bot.db.get_warnings(user_id, guild_id)
 
     async def reset_warnings(self, user_id: int, guild_id: int):
-        await db.reset_warnings(user_id, guild_id)
+        await self.bot.db.reset_warnings(user_id, guild_id)
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -128,6 +127,5 @@ class AutoMod(commands.Cog):
 
 
 async def setup(bot):
-    await db.init()
     await bot.add_cog(AutoMod(bot))
     logging.getLogger("bot").info("Loaded automod cog.")

@@ -1,56 +1,66 @@
 import discord
 from discord.ext import commands
 import time
-import aiohttp  
+import aiohttp
 from constants.configs import DISCORD_TOKEN
-from utils.loggingConfig import setup_logging
+from utils.log_configs import setup_logging
+from utils.database import Database
 
-logger = setup_logging()  
-start_time = time.time()  
-warnings = {}  
+logger = setup_logging()
+start_time = time.time()
 
-intents = discord.Intents.default()  
-intents.members = True  
-intents.message_content = True  
-
-class KurumiBot(commands.AutoShardedBot):  
+class KurumiBot(commands.AutoShardedBot):
     def __init__(self):
+        intents = discord.Intents.default()
+        intents.members = True
+        intents.message_content = True
+        
         super().__init__(
             command_prefix='!',
             intents=intents,
             help_command=None
         )
+        
+        self.db = Database()
         self.session: aiohttp.ClientSession = None
 
     async def setup_hook(self):
-        print("Running setup_hook...")  
+        print("Running setup_hook...")
         
+        await self.db.init()
+        print("✅ Database connection established.")
+
         self.session = aiohttp.ClientSession()
         print("✅ HTTP Client Session initialized.")
 
         extensions = [
-            "cogs.automod",  
-            "cogs.information",  
-            "cogs.moderator",  
-            "cogs.miscellaneous",  
-            "cogs.manager",  
-            "cogs.events",  
-            "cogs.errors",  
-            "cogs.antiScam",  
+            "cogs.automod",
+            "cogs.information",
+            "cogs.moderator",
+            "cogs.miscellaneous",
+            "cogs.manager",
+            "cogs.events",
+            "cogs.errors",
+            "cogs.anti_scam",
         ]
         
-        for ext in extensions:  
+        for ext in extensions:
             try:
-                await self.load_extension(ext)  
+                await self.load_extension(ext)
             except Exception as e:
-                print(f"❌ Failed to load extension {ext}: {e}")  
+                print(f"❌ Failed to load extension {ext}: {e}")
 
     async def close(self):
+        if hasattr(self, 'db'):
+            await self.db.close()
+            print("🛑 Database connection closed.")
+            
         if self.session:
             await self.session.close()
             print("🛑 HTTP Client Session closed.")
+            
         await super().close()
 
-if __name__ == "__main__":  
-    bot = KurumiBot()  
-    bot.run(DISCORD_TOKEN)  
+if __name__ == "__main__":
+    bot = KurumiBot()
+    bot.run(DISCORD_TOKEN)
