@@ -2,7 +2,6 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import aiohttp
-from typing import Optional
 import asyncio
 import logging
 from utils.anime_helper import (
@@ -26,7 +25,7 @@ Responsibilities:
 - Contain helpers for cleaning and formatting text, dates, and select-based UI interactions.
 
 Notes:
-- Network calls are performed via an internal aiohttp.ClientSession created by the cog.
+- Network calls are performed via the shared bot.session to utilize connection pooling.
 - The GenericSelectView bridges a Select UI and an embed builder callback to show detailed results.
 - TextUtils centralizes common formatting and truncation logic for safe embed content.
 """
@@ -39,24 +38,18 @@ class Misc(commands.Cog):
     - Image fetchers: cats, dogs, rabbits
     - AniList-backed search: anime, animecharacter (uses GraphQL)
     - Avatar command for users
-    - Uses an internal aiohttp.ClientSession; the session is closed on cog unload.
+    - Uses the shared self.bot.session for HTTP requests.
     """
     def __init__(self, bot):
         self.bot = bot
-        self.session: aiohttp.ClientSession = aiohttp.ClientSession()
-        self._session_close_task: Optional[asyncio.Task] = None
+        # Removed local session creation in favor of shared bot.session
 
-    def cog_unload(self) -> None:
-        """Ensure the aiohttp session is closed when the cog is unloaded (schedules close as a background task)."""
-        if not self.session.closed:
-            self._session_close_task = asyncio.create_task(self.session.close())
-            
     async def fetch_animal(self, ctx: commands.Context, api_url: str, animal_type: str, title: str, color: discord.Color, json_response_key: str):
         """Helper function to fetch a random animal image."""
         await self._defer_if_slash(ctx)
 
         try:
-            async with self.session.get(api_url) as resp:
+            async with self.bot.session.get(api_url) as resp:
                 if resp.status != 200:
                     return await ctx.send(f"❌ Couldn't fetch a {animal_type} right now.")
                 data = await resp.json()
@@ -144,7 +137,7 @@ class Misc(commands.Cog):
 
         variables = {"search": query}
         try:
-            async with self.session.post(
+            async with self.bot.session.post(
                 ANILIST_API,
                 json={"query": ANILIST_SEARCH_QUERY, "variables": variables},
             ) as resp:
@@ -175,7 +168,7 @@ class Misc(commands.Cog):
 
         try:
             variables = {"search": query}
-            async with self.session.post(
+            async with self.bot.session.post(
                 ANILIST_API,
                 json={"query": ANILIST_CHARACTER_SEARCH_QUERY, "variables": variables},
             ) as resp:

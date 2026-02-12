@@ -8,7 +8,7 @@ from datetime import timedelta
 import logging
 from constants.configs import MAX_WARNINGS
 from utils.mod_utils import enforce_punishments
-from constants.configs import NO_REASON
+from constants.configs import DEFAULT_REASON
 from utils.audit_view import AuditLogView
 
 """
@@ -101,7 +101,7 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(moderate_members=True)
     @app_commands.describe(member="The member to timeout", duration="Duration (e.g., 10s, 5m, 1h, 1d). Defaults to 10m.", reason="The reason for the timeout")
-    async def mute(self, ctx: commands.Context, member: discord.Member, duration: str = "10m", *, reason: str = NO_REASON):
+    async def mute(self, ctx: commands.Context, member: discord.Member, duration: str = "10m", *, reason: str = DEFAULT_REASON):
         """
         Apply a timeout (communication disable) to a member for a parsed duration.
         """
@@ -135,7 +135,7 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(kick_members=True)
     @app_commands.describe(member="The member to kick", reason="The reason for the kick")
-    async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = NO_REASON):
+    async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = DEFAULT_REASON):
         """Kick a member from the guild with basic safety checks (self/owner/bot)."""
         if member == ctx.author:
             return await ctx.send("You can't kick yourself.")
@@ -151,7 +151,7 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
     @app_commands.describe(member="The member to ban", reason="The reason for the ban")
-    async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = NO_REASON):
+    async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = DEFAULT_REASON):
         """Ban a member from the guild with basic safety checks."""
         if member == ctx.author:
             return await ctx.send("You can't ban yourself.")
@@ -167,7 +167,7 @@ class Moderator(commands.Cog):
     @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     @app_commands.describe(member="The member to warn", reason="The reason for the warning")
-    async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str = NO_REASON):
+    async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str = DEFAULT_REASON):
         """
         Issue a persistent warning to a member and run the same escalation logic used by AutoMod.
 
