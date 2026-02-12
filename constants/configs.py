@@ -56,7 +56,7 @@ GIF_ASSETS = {
     "Kurumi_4" : "kurumi4.gif",
 }
 
-NO_REASON = "No reason provided"
+DEFAULT_REASON = "No reason provided"
 ANILIST_API = "https://graphql.anilist.co"
 ANILIST_SEARCH_QUERY = """
 query ($search: String) {

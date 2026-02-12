@@ -2,6 +2,7 @@ import logging
 import discord
 from discord.ext import commands
 from discord import app_commands, Interaction, Attachment
+from discord.ui import View, button
 from datetime import timedelta
 import re
 from typing import Optional
@@ -30,6 +31,31 @@ Notes:
 - The `invites` command includes a safety path for large servers: it warns the caller and requires confirmation
   before proceeding, and only displays up to a configured maximum number of invites to avoid huge memory/time usage.
 """
+
+class ConfirmView(View):
+    """Simple confirmation view with Confirm and Cancel buttons."""
+    def __init__(self, author_id: int, timeout: float):
+        super().__init__(timeout=timeout)
+        self.author_id = author_id
+        self.value = None
+
+    async def interaction_check(self, interaction: Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("This confirmation is not for you.", ephemeral=True)
+            return False
+        return True
+
+    @button(label="Confirm", style=discord.ButtonStyle.green)
+    async def confirm(self, interaction: Interaction, button: discord.ui.Button):
+        self.value = True
+        await interaction.response.defer()
+        self.stop()
+
+    @button(label="Cancel", style=discord.ButtonStyle.red)
+    async def cancel(self, interaction: Interaction, button: discord.ui.Button):
+        self.value = False
+        await interaction.response.defer()
+        self.stop()
 
 class Manager(commands.Cog):
     """
@@ -71,18 +97,27 @@ class Manager(commands.Cog):
             if ctx.interaction:
                 await ctx.defer(ephemeral=True)
             
+            view = ConfirmView(ctx.author.id, timeout=INVITES_CONFIRM_TIMEOUT)
             confirm_msg = await ctx.send(
                 f"⚠️ **Large Server Detected** ({ctx.guild.member_count} members).\n"
-                f"Fetching invites might take a moment. Reply `yes` within {INVITES_CONFIRM_TIMEOUT}s to proceed."
+                f"Fetching invites might take a moment. Click confirm to proceed.",
+                view=view
             )
 
-            def check(m):
-                return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() == 'yes'
+            await view.wait()
 
-            try:
-                await self.bot.wait_for('message', check=check, timeout=INVITES_CONFIRM_TIMEOUT)
-            except TimeoutError:
-                return await ctx.send("❌ Timed out. Cancelled invite fetch.")
+            if view.value is None:
+                try:
+                    await confirm_msg.edit(content="❌ Timed out.", view=None)
+                except Exception:
+                    pass
+                return
+            elif view.value is False:
+                try:
+                    await confirm_msg.edit(content="❌ Cancelled invite fetch.", view=None)
+                except Exception:
+                    pass
+                return
             
             try:
                 await confirm_msg.delete()
