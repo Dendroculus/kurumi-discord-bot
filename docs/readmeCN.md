@@ -1,6 +1,6 @@
 <div align="center">
   <p>
-    <a href="https://github.com/Dendroculus/kurumi-discord-bot/blob/main/README.md">EN</a> | <strong>CN</strong>
+    <a href="https://github.com/Yoruxyv/kurumi-discord-bot/blob/main/README.md">EN</a> | <strong>CN</strong>
   </p>
 
   <img src="../assets/emojis/kurumichibi.png" width="220" alt="Kurumi Chibi Logo" />
@@ -43,7 +43,7 @@ Kurumi 包含 42 个命令，旨在让服务器管理变得更轻松、更有趣
 
 1. 克隆仓库
 ```bash
-git clone https://github.com/Dendroculus/kurumi-discord-bot.git
+git clone https://github.com/Yoruxyv/kurumi-discord-bot.git
 cd kurumi-discord-bot
 ```
 
@@ -119,5 +119,5 @@ python main.py
 - 表情符号资产由开发者制作。如果您分叉（fork）了此仓库，请将表情文件上传到您的 Discord 开发者门户并在代码中更新 ID。
 
 <div align="center">
-  <sub>💜 作者：<a href="https://github.com/Dendroculus">Dendroculus</a></sub>
+  <sub>💜 作者：<a href="https://github.com/Yoruxyv">Yoruxyv</a></sub>
 </div>

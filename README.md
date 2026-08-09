@@ -1,6 +1,6 @@
 <div align="center">
   <p>
-    <strong>EN</strong> | <a href="https://github.com/Dendroculus/kurumi-discord-bot/blob/main/docs/readmeCN.md">CN</a>
+    <strong>EN</strong> | <a href="https://github.com/Yoruxyv/kurumi-discord-bot/blob/main/docs/readmeCN.md">CN</a>
   </p>
 
   <img src="assets/emojis/kurumichibi.png" width="220" alt="Kurumi Chibi Logo" />
@@ -42,7 +42,7 @@ Follow these steps to get Kurumi running on your machine.
 
 1. Clone the repository
 ```bash
-git clone https://github.com/Dendroculus/kurumi-discord-bot.git
+git clone https://github.com/Yoruxyv/kurumi-discord-bot.git
 cd kurumi-discord-bot
 ```
 
@@ -119,5 +119,5 @@ Disclaimer:
 
 
 <div align="center">
-  <sub>Made with 💜 by <a href="https://github.com/Dendroculus">Dendroculus</a></sub>
+  <sub>Made with 💜 by <a href="https://github.com/Yoruxyv">Yoruxyv</a></sub>
 </div>
